@@ -5,6 +5,8 @@ package graph
 
 import (
 	"context"
+	"github.com/bcc-code/brunstadtv/backend/graph/api/v1/generated"
+	"github.com/bcc-code/brunstadtv/backend/graph/api/v1/model"
 	"net/url"
 	"strconv"
 	"time"
@@ -16,8 +18,6 @@ import (
 	"github.com/bcc-code/brunstadtv/backend/common"
 	"github.com/bcc-code/brunstadtv/backend/email"
 	"github.com/bcc-code/brunstadtv/backend/export"
-	"github.com/bcc-code/brunstadtv/backend/graph/api/generated"
-	"github.com/bcc-code/brunstadtv/backend/graph/api/model"
 	"github.com/bcc-code/brunstadtv/backend/memorycache"
 	"github.com/bcc-code/brunstadtv/backend/sqlc"
 	"github.com/bcc-code/brunstadtv/backend/user"

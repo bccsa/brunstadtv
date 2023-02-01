@@ -5,9 +5,8 @@ package graph
 
 import (
 	"context"
-
-	"github.com/bcc-code/brunstadtv/backend/graph/api/generated"
-	"github.com/bcc-code/brunstadtv/backend/graph/api/model"
+	"github.com/bcc-code/brunstadtv/backend/graph/api/v1/generated"
+	"github.com/bcc-code/brunstadtv/backend/graph/api/v1/model"
 )
 
 // Show is the resolver for the show field.

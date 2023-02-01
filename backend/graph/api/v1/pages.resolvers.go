@@ -5,12 +5,12 @@ package graph
 
 import (
 	"context"
+	"github.com/bcc-code/brunstadtv/backend/graph/api/v1/generated"
+	"github.com/bcc-code/brunstadtv/backend/graph/api/v1/model"
 	"strconv"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/graph/api/generated"
-	"github.com/bcc-code/brunstadtv/backend/graph/api/model"
 	"github.com/bcc-code/brunstadtv/backend/user"
 	"github.com/bcc-code/brunstadtv/backend/utils"
 	"github.com/samber/lo"

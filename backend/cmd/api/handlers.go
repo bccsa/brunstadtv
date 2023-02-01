@@ -12,8 +12,8 @@ import (
 	"github.com/bcc-code/brunstadtv/backend/email"
 	graphadmin "github.com/bcc-code/brunstadtv/backend/graph/admin"
 	graphadmingenerated "github.com/bcc-code/brunstadtv/backend/graph/admin/generated"
-	graphapi "github.com/bcc-code/brunstadtv/backend/graph/api"
-	graphapigenerated "github.com/bcc-code/brunstadtv/backend/graph/api/generated"
+	graphapi "github.com/bcc-code/brunstadtv/backend/graph/api/v1"
+	graphapigenerated "github.com/bcc-code/brunstadtv/backend/graph/api/v1/generated"
 	"github.com/bcc-code/brunstadtv/backend/graph/gqltracer"
 	graphpublic "github.com/bcc-code/brunstadtv/backend/graph/public"
 	graphpublicgenerated "github.com/bcc-code/brunstadtv/backend/graph/public/generated"
@@ -83,7 +83,10 @@ func graphqlHandler(
 	})
 
 	return func(c *gin.Context) {
-		h.ServeHTTP(c.Writer, c.Request)
+		switch c.GetHeader("x-api-version") {
+		default:
+			h.ServeHTTP(c.Writer, c.Request)
+		}
 	}
 }
 

@@ -6,14 +6,14 @@ package graph
 import (
 	"context"
 	"errors"
+	"github.com/bcc-code/brunstadtv/backend/graph/api/v1/generated"
+	"github.com/bcc-code/brunstadtv/backend/graph/api/v1/model"
 	"strconv"
 	"time"
 
 	merry "github.com/ansel1/merry/v2"
 	"github.com/bcc-code/brunstadtv/backend/applications"
 	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/graph/api/generated"
-	"github.com/bcc-code/brunstadtv/backend/graph/api/model"
 	"github.com/bcc-code/brunstadtv/backend/items/show"
 	"github.com/bcc-code/brunstadtv/backend/user"
 	"github.com/bcc-code/brunstadtv/backend/utils"

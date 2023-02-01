@@ -5,10 +5,9 @@ package graph
 
 import (
 	"context"
+	"github.com/bcc-code/brunstadtv/backend/graph/api/v1/generated"
+	"github.com/bcc-code/brunstadtv/backend/graph/api/v1/model"
 	"time"
-
-	"github.com/bcc-code/brunstadtv/backend/graph/api/generated"
-	"github.com/bcc-code/brunstadtv/backend/graph/api/model"
 )
 
 // Global is the resolver for the global field.

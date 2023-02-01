@@ -25,7 +25,7 @@ install-dep-macos:
 	brew install sqlc
 
 gql.api:
-	cd graph/api && gqlgen
+	cd graph/api/v1 && gqlgen
 
 gql.public:
 	cd graph/public && gqlgen
