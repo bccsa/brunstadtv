@@ -90,6 +90,15 @@ onMounted(async () => {
         },
     })
 
+    // create a event when player is created
+    const livePlayer = new CustomEvent("livePlayer", {
+            detail: player.value,
+            bubbles: false,
+            cancelable: true,
+            composed: false,
+        })
+        window.dispatchEvent(livePlayer)
+
     window.addEventListener("keydown", onSpaceBar)
 })
 
