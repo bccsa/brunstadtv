@@ -92,7 +92,7 @@ onMounted(async () => {
 
     // create a event when player is created
     const livePlayer = new CustomEvent("livePlayer", {
-            detail: player.value,
+            detail: player,
             bubbles: false,
             cancelable: true,
             composed: false,
