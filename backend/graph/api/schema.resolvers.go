@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Code-Hex/go-generics-cache"
 	merry "github.com/ansel1/merry/v2"
 	"github.com/bcc-code/brunstadtv/backend/achievements"
 	"github.com/bcc-code/brunstadtv/backend/applications"
@@ -59,6 +60,15 @@ func (r *queryRootResolver) Application(ctx context.Context) (*model.Application
 		SearchPage:    searchPage,
 		ClientVersion: app.ClientVersion,
 	}, nil
+}
+
+// Languages is the resolver for the languages field.
+func (r *queryRootResolver) Languages(ctx context.Context) ([]string, error) {
+	languages, err := memorycache.GetOrSet(ctx, "languages", r.Queries.GetLanguageKeys, cache.WithExpiration(time.Minute*5))
+	if err != nil {
+		return nil, err
+	}
+	return languages, nil
 }
 
 // Export is the resolver for the export field.
@@ -408,14 +418,25 @@ func (r *queryRootResolver) Me(ctx context.Context) (*model.User, error) {
 	usr := user.GetFromCtx(gc)
 
 	u := &model.User{
-		Anonymous: usr.IsAnonymous(),
-		BccMember: usr.IsActiveBCC(),
-		Roles:     usr.Roles,
-		Analytics: &model.Analytics{},
+		Anonymous:   usr.IsAnonymous(),
+		BccMember:   usr.IsActiveBCC(),
+		Roles:       usr.Roles,
+		DisplayName: usr.DisplayName,
+		FirstName:   usr.FirstName,
+		Analytics:   &model.Analytics{},
 	}
 
 	if pid := gc.GetString(auth0.CtxUserID); pid != "" {
 		u.ID = &pid
+	}
+
+	switch usr.Gender {
+	case "male":
+		u.Gender = model.GenderMale
+	case "female":
+		u.Gender = model.GenderFemale
+	default:
+		u.Gender = model.GenderUnknown
 	}
 
 	//if aud := gc.GetString(auth0.CtxAudience); aud != "" {
@@ -424,6 +445,7 @@ func (r *queryRootResolver) Me(ctx context.Context) (*model.User, error) {
 
 	if usr.Email != "" {
 		u.Email = &usr.Email
+		u.EmailVerified = usr.EmailVerified
 	}
 
 	return u, nil
@@ -568,7 +590,26 @@ func (r *queryRootResolver) Prompts(ctx context.Context) ([]model.Prompt, error)
 	return utils.MapWithCtx(ctx, surveys, model.PromptFrom), nil
 }
 
+// EmailVerified is the resolver for the emailVerified field.
+func (r *userResolver) EmailVerified(ctx context.Context, obj *model.User) (bool, error) {
+	if obj.EmailVerified || obj.Anonymous || obj.ID == nil {
+		return obj.EmailVerified, nil
+	}
+	return memorycache.GetOrSet(ctx, "userinfo:email_verified:"+*obj.ID, func(ctx context.Context) (bool, error) {
+		ginCtx, _ := utils.GinCtx(ctx)
+		info, err := r.AuthClient.GetUser(ctx, ginCtx.GetString(auth0.CtxUserID))
+		if err != nil {
+			return false, err
+		}
+		return info.EmailVerified, nil
+	}, cache.WithExpiration(time.Second*2))
+}
+
 // QueryRoot returns generated.QueryRootResolver implementation.
 func (r *Resolver) QueryRoot() generated.QueryRootResolver { return &queryRootResolver{r} }
 
+// User returns generated.UserResolver implementation.
+func (r *Resolver) User() generated.UserResolver { return &userResolver{r} }
+
 type queryRootResolver struct{ *Resolver }
+type userResolver struct{ *Resolver }
