@@ -163,6 +163,7 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 				Anonymous: false,
 				ActiveBCC: ctx.GetBool(auth0.CtxIsBCCMember),
 				AgeGroup:  "unknown",
+				Gender:    "unknown",
 			}
 
 			saveUser := func() error {
@@ -170,11 +171,13 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 					ID:            u.PersonID,
 					Roles:         u.Roles,
 					DisplayName:   u.DisplayName,
+					FirstName:     u.FirstName,
 					ActiveBcc:     u.ActiveBCC,
 					EmailVerified: u.EmailVerified,
 					Email:         u.Email,
 					AgeGroup:      u.AgeGroup,
 					Age:           int32(u.Age),
+					Gender:        u.Gender,
 					ChurchIds: lo.Map(u.ChurchIDs, func(i int, _ int) int32 {
 						return int32(i)
 					}),
@@ -206,6 +209,15 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 					ctx.Set(CtxUser, u)
 					return u, nil
 				}
+				u.FirstName = member.FirstName
+				switch member.Gender {
+				case "Male":
+					u.Gender = "male"
+				case "Female":
+					u.Gender = "female"
+				default:
+					u.Gender = "unknown"
+				}
 				u.Email = member.Email
 				u.DisplayName = member.DisplayName
 				u.Age = member.Age
@@ -215,13 +227,24 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 					return i.OrgID
 				})
 			} else {
-				info, err := auth0Client.GetUserInfoForAuthHeader(ctx, ctx.GetHeader("Authorization"))
+				info, err := auth0Client.GetUser(ctx, ctx.GetString(auth0.CtxUserID))
 				if err != nil {
 					return nil, err
 				}
-				u.PersonID = info.Sub
+				u.PersonID = info.UserId
 				u.Email = info.Email
 				u.DisplayName = info.Nickname
+				u.EmailVerified = info.EmailVerified
+
+				if info.UserMetadata.BirthYear != 0 && info.UserMetadata.BirthMonth != 0 {
+					t, _ := time.Parse("2006-1", fmt.Sprintf("%d-%d", info.UserMetadata.BirthYear, info.UserMetadata.BirthMonth))
+
+					u.Age = time.Now().Year() - t.Year()
+
+					if t.Month() > time.Now().Month() {
+						u.Age -= 1
+					}
+				}
 			}
 
 			if u.Email == "" {
