@@ -5,8 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/bcc-code/brunstadtv/backend/applications"
 	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/brunstadtv/backend/memorycache"
 	"github.com/bcc-code/brunstadtv/backend/remotecache"
 	"github.com/bsm/redislock"
 	"github.com/gin-contrib/pprof"
@@ -118,15 +120,10 @@ func playgroundHandler() gin.HandlerFunc {
 	}
 }
 
-var apps []common.Application
-
 func getApplications(ctx context.Context, queries *sqlc.Queries) []common.Application {
-	if apps == nil {
-		stored, err := queries.ListApplications(ctx)
-		if err != nil {
-			log.L.Panic().Err(err).Send()
-		}
-		apps = stored
+	apps, err := memorycache.GetOrSet(ctx, "applications", queries.ListApplications, cache.WithExpiration(time.Minute*2))
+	if err != nil {
+		log.L.Panic().Err(err).Send()
 	}
 	return apps
 }
@@ -179,11 +176,14 @@ func main() {
 
 	log.L.Info().Msg("Setting up tracing!")
 	utils.MustSetupTracing("BTV-API", config.Tracing)
+
 	ctx, span := otel.Tracer("api/core").Start(ctx, "init")
 	db, dbChan := utils.MustCreateDBClient(ctx, config.DB)
+
 	redisClient, rdbChan := utils.MustCreateRedisClient(ctx, config.Redis)
 	locker := redislock.New(redisClient)
 	remoteCache := remotecache.New(redisClient, locker)
+
 	jwkChan := lo.Async(func() gin.HandlerFunc {
 		handler := jwksHandler(config.Redirect)
 		log.L.Info().Msg("JWK generated")
@@ -269,6 +269,7 @@ func main() {
 		s3Client,
 		config.AnalyticsSalt,
 		authClient,
+		remoteCache,
 	))
 	r.GET("/", playgroundHandler())
 	r.POST("/admin", adminGraphqlHandler(config, db, queries, ls))

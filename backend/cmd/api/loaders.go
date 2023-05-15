@@ -37,6 +37,8 @@ func getLoadersForRoles(db *sql.DB, queries *sqlc.Queries, collectionLoader *loa
 	rq := queries.RoleQueries(roles)
 
 	ls := &common.FilteredLoaders{
+		Key: key,
+
 		ShowFilterLoader:        loaders.NewFilterLoader(ctx, rq.GetShowIDsWithRoles, loaders.WithName("show-filter")),
 		ShowUUIDFilterLoader:    loaders.NewFilterLoader(ctx, rq.GetShowUUIDsWithRoles, loaders.WithName("show-uuid-filter")),
 		SeasonFilterLoader:      loaders.NewFilterLoader(ctx, rq.GetSeasonIDsWithRoles, loaders.WithName("season-filter")),
@@ -96,6 +98,11 @@ func getLoadersForProfile(queries *sqlc.Queries, profileID uuid.UUID) *common.Pr
 		}, loaders.WithMemoryCache(time.Second*5), loaders.WithName("task-completed")),
 		AchievementAchievedAtLoader:   loaders.New(ctx, profileQueries.GetAchievementsAchievedAt, loaders.WithMemoryCache(time.Second*5), loaders.WithName("achieved-at")),
 		GetSelectedAlternativesLoader: loaders.New(ctx, profileQueries.GetSelectedAlternatives, loaders.WithMemoryCache(time.Second*1), loaders.WithName("selected-alternatives")),
+
+		SeasonDefaultEpisodeLoader: loaders.NewConversionLoader(ctx, profileQueries.DefaultEpisodeIDForSeasonIDs, loaders.WithMemoryCache(time.Second*5), loaders.WithName("season-default-episodes")),
+		ShowDefaultEpisodeLoader:   loaders.NewConversionLoader(ctx, profileQueries.DefaultEpisodeIDForShowIDs, loaders.WithMemoryCache(time.Second*5), loaders.WithName("show-default-episodes")),
+
+		TopicDefaultLessonLoader: loaders.NewConversionLoader(ctx, profileQueries.GetDefaultLessonIDForTopicIDs, loaders.WithMemoryCache(time.Second*5), loaders.WithName("topic-default-lessons")),
 	}
 
 	profileLoaders.Set(profileID, ls, loaders.WithOnDelete(func() {
@@ -105,6 +112,9 @@ func getLoadersForProfile(queries *sqlc.Queries, profileID uuid.UUID) *common.Pr
 		ls.AchievementAchievedAtLoader.ClearAll()
 		ls.ProgressLoader.ClearAll()
 		ls.GetSelectedAlternativesLoader.ClearAll()
+
+		ls.SeasonDefaultEpisodeLoader.ClearAll()
+		ls.ShowDefaultEpisodeLoader.ClearAll()
 
 		cancel()
 	}))

@@ -150,7 +150,7 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 			if ctx.GetBool(auth0.CtxIsBCCMember) {
 				roles = append(roles, RoleBCCMember)
 			} else {
-				roles = append(roles, RoleNonBCCMember)
+				roles = append(roles, RoleNonBCCMember, RolePublic)
 			}
 
 			if pid == "" || pid == "0" {
@@ -236,15 +236,13 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 				u.DisplayName = info.Nickname
 				u.EmailVerified = info.EmailVerified
 
-				if info.UserMetadata.BirthYear != 0 && info.UserMetadata.BirthMonth != 0 {
-					t, _ := time.Parse("2006-1", fmt.Sprintf("%d-%d", info.UserMetadata.BirthYear, info.UserMetadata.BirthMonth))
-
-					u.Age = time.Now().Year() - t.Year()
-
-					if t.Month() > time.Now().Month() {
-						u.Age -= 1
+				if by, ok := info.UserMetadata["birth_year"]; ok {
+					year, err := strconv.ParseInt(by, 10, 64)
+					if err == nil {
+						u.Age = time.Now().Year() - int(year)
 					}
 				}
+				u.CompletedRegistration = info.CompletedRegistration()
 			}
 
 			if u.Email == "" {
@@ -290,9 +288,16 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 		}()
 		if u, err := remotecache.GetOrCreate[*common.User](ctx, remoteCache, fmt.Sprintf("users:%s", userID), getUserFromMembers); err == nil {
 			span.AddEvent("User loaded into cache")
-			userCache.Set(userID, u, cache.WithExpiration(60*time.Minute))
+			userCache.Set(userID, u, cache.WithExpiration(60*time.Second))
 			ctx.Set(CtxUser, u)
 			return
+		} else {
+			log.L.Error().Err(err).Send()
+			ctx.Set(CtxUser, &common.User{
+				Roles:     roles,
+				Anonymous: true,
+				ActiveBCC: false,
+			})
 		}
 	}
 }

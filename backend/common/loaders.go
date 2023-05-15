@@ -32,9 +32,9 @@ type BatchLoaders struct {
 	FilesLoader                        *loaders.Loader[int, []*File]
 	StreamsLoader                      *loaders.Loader[int, []*Stream]
 	EventLoader                        *loaders.Loader[int, *Event]
-	FAQCategoryLoader                  *loaders.Loader[int, *FAQCategory]
-	QuestionLoader                     *loaders.Loader[int, *Question]
-	QuestionsLoader                    *loaders.Loader[int, []*int]
+	FAQCategoryLoader                  *loaders.Loader[uuid.UUID, *FAQCategory]
+	QuestionLoader                     *loaders.Loader[uuid.UUID, *Question]
+	QuestionsLoader                    *loaders.Loader[uuid.UUID, []*uuid.UUID]
 	ProfilesLoader                     *loaders.Loader[string, []*Profile]
 	MessageGroupLoader                 *loaders.Loader[int, *MessageGroup]
 	RedirectFromCodeLoader             *loaders.Loader[string, *Redirect]
@@ -86,6 +86,8 @@ type ApplicationLoaders struct {
 
 // FilteredLoaders contains loaders that will be filtered by permissions.
 type FilteredLoaders struct {
+	Key string
+
 	EpisodeFilterLoader     *loaders.Loader[int, *int]
 	EpisodeUUIDFilterLoader *loaders.Loader[uuid.UUID, *uuid.UUID]
 	EpisodesLoader          *loaders.Loader[int, []*int]
@@ -120,4 +122,9 @@ type ProfileLoaders struct {
 	TaskCompletedLoader           *loaders.Loader[uuid.UUID, *uuid.UUID]
 	AchievementAchievedAtLoader   *loaders.Loader[uuid.UUID, *Achieved]
 	GetSelectedAlternativesLoader *loaders.Loader[uuid.UUID, *SelectedAlternatives]
+
+	SeasonDefaultEpisodeLoader *loaders.Loader[int, *int]
+	ShowDefaultEpisodeLoader   *loaders.Loader[int, *int]
+
+	TopicDefaultLessonLoader *loaders.Loader[uuid.UUID, *uuid.UUID]
 }

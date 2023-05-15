@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"github.com/bcc-code/brunstadtv/backend/auth0"
+	"github.com/bcc-code/brunstadtv/backend/remotecache"
 	"strconv"
 	"sync"
 	"time"
@@ -62,6 +63,7 @@ type Resolver struct {
 	AnalyticsIDFactory func(ctx context.Context) string
 	RedirectConfig     redirectConfig
 	AuthClient         *auth0.Client
+	RemoteCache        *remotecache.Client
 }
 
 func (r *Resolver) GetQueries() *sqlc.Queries {
@@ -129,7 +131,7 @@ var truncateTime = time.Second * 1
 func withCacheAndTimestamp[r any](ctx context.Context, key string, factory func(ctx context.Context) (r, error), expiry time.Duration, timestamp *string) (r, error) {
 	ctx, span := otel.Tracer("cache").Start(ctx, "with-timestamp")
 	defer span.End()
-	ts, err := timestampFromString(timestamp)
+	ts, err := utils.TimestampFromString(timestamp)
 	if err != nil {
 		var result r
 		return result, err
@@ -179,18 +181,6 @@ func withCacheAndTimestamp[r any](ctx context.Context, key string, factory func(
 	requestCache.Set(key, entry, cache.WithExpiration(expiry))
 
 	return entry.Entry, nil
-}
-
-func timestampFromString(timestamp *string) (*time.Time, error) {
-	var r *time.Time
-	if timestamp != nil {
-		t, err := time.Parse(time.RFC3339, *timestamp)
-		if err != nil {
-			return nil, err
-		}
-		r = &t
-	}
-	return r, nil
 }
 
 type itemLoaders[k comparable, t any] struct {
@@ -484,4 +474,15 @@ func (r *Resolver) updateMessage(ctx context.Context, id string, message *string
 		return "", err
 	}
 	return id, err
+}
+
+func (r *Resolver) getUserInfo(ctx context.Context, userID string) (auth0.UserInfo, error) {
+	return memorycache.GetOrSet(ctx, "userinfo:"+userID, func(ctx context.Context) (auth0.UserInfo, error) {
+		ginCtx, _ := utils.GinCtx(ctx)
+		info, err := r.AuthClient.GetUser(ctx, ginCtx.GetString(auth0.CtxUserID))
+		if err != nil {
+			return auth0.UserInfo{}, err
+		}
+		return info, nil
+	}, cache.WithExpiration(time.Second*2))
 }

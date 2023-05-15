@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ansel1/merry/v2"
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/ansel1/merry/v2"
 )
 
 var httpClient = &http.Client{
@@ -39,6 +40,10 @@ func sendManagementRequest[T any](ctx context.Context, client *Client, method, p
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
 	res, err := httpClient.Do(req)
 	if err != nil {
 		return
@@ -60,13 +65,13 @@ func (c *Client) GetUser(ctx context.Context, sub string) (UserInfo, error) {
 }
 
 // UpdateUser updates user
-func (c *Client) UpdateUser(ctx context.Context, sub string, info UserInfo) (UserInfo, error) {
-	return sendManagementRequest[UserInfo](ctx, c, http.MethodPatch, sub, map[string]any{
+func (c *Client) UpdateUser(ctx context.Context, sub string, info UserInfo, metadata UserMetadata) (UserInfo, error) {
+	return sendManagementRequest[UserInfo](ctx, c, http.MethodPatch, "users/"+sub, map[string]any{
 		"name":          info.Name,
 		"given_name":    info.GivenName,
 		"family_name":   info.FamilyName,
 		"nickname":      info.Nickname,
-		"user_metadata": info.UserMetadata,
+		"user_metadata": metadata,
 	})
 }
 
@@ -81,7 +86,8 @@ type jobResponse struct {
 func (c *Client) SendVerificationEmail(ctx context.Context, sub string) error {
 	// TODO: implement verification emails for socials (should most likely not be necessary though)
 	_, err := sendManagementRequest[jobResponse](ctx, c, http.MethodPost, "jobs/verification-email", map[string]any{
-		"user_id": sub,
+		"user_id":   sub,
+		"client_id": c.config.ClientID,
 	})
 	return err
 }

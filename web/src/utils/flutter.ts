@@ -1,4 +1,5 @@
 import { FlutterWebView } from "@/flutter"
+import settings from "@/services/settings"
 
 type HapticFeedbackType =
     | "lightImpact"
@@ -14,7 +15,7 @@ class FlutterMain {
         this.webView = webView
     }
 
-    navigate(path: String): Promise<any> | null {
+    navigate(path: string): Promise<any> | null {
         var promise = this.webView.callHandler(
             this.handlerName,
             "navigate",
@@ -23,12 +24,12 @@ class FlutterMain {
         return !promise?.then ? null : promise
     }
 
-    push(path: String): Promise<any> {
+    push(path: string): Promise<any> {
         var promise = this.webView.callHandler(this.handlerName, "push", path)
         return !promise?.then ? null : promise
     }
 
-    getAccessToken(): Promise<String | null> {
+    getAccessToken(): Promise<string | null> {
         return this.webView.callHandler(this.handlerName, "get_access_token")
     }
 
@@ -87,6 +88,7 @@ function addQueryParameter(
 }
 
 export const openInBrowser = (url: string) => {
-    const newUrl = addQueryParameter(url, "launch_url", "true")
+    let newUrl = addQueryParameter(url, "launch_url", "true")
+    newUrl = addQueryParameter(newUrl, "locale", settings.locale)
     window.location.assign(newUrl)
 }
