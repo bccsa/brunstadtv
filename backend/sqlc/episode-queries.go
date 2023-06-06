@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"strconv"
+
+	"github.com/google/uuid"
 
 	"github.com/bcc-code/brunstadtv/backend/common"
 	"github.com/bcc-code/brunstadtv/backend/loaders"
@@ -56,6 +57,8 @@ func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 			Images:                q.getImages(e.Images),
 			AgeRating:             e.Agerating,
 			Duration:              int(e.Duration.ValueOrZero()),
+			Audience:              e.Audience,
+			ContentType:           e.ContentType,
 			TagIDs: lo.Map(e.TagIds, func(id int32, _ int) int {
 				return int(id)
 			}),
@@ -210,6 +213,23 @@ func (q *Queries) GetEpisodeIDsForUuids(ctx context.Context, uuids []uuid.UUID) 
 		return conversion[uuid.UUID, int]{
 			source: i.Original,
 			result: int(i.Result),
+		}
+	}), nil
+}
+
+// GetEpisodeIDsWithTagIDs returns episodeIDs with the specified tags.
+func (rq *RoleQueries) GetEpisodeIDsWithTagIDs(ctx context.Context, ids []int) ([]loaders.Relation[int, int], error) {
+	rows, err := rq.queries.getEpisodeIDsWithTagIDs(ctx, getEpisodeIDsWithTagIDsParams{
+		Roles:  rq.roles,
+		TagIds: intToInt32(ids),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return lo.Map(rows, func(i getEpisodeIDsWithTagIDsRow, _ int) loaders.Relation[int, int] {
+		return relation[int, int]{
+			ID:       int(i.ID),
+			ParentID: int(i.ParentID),
 		}
 	}), nil
 }

@@ -246,6 +246,53 @@ func (q *Queries) getEpisodeIDsWithRoles(ctx context.Context, arg getEpisodeIDsW
 	return items, nil
 }
 
+const getEpisodeIDsWithTagIDs = `-- name: getEpisodeIDsWithTagIDs :many
+SELECT t.episodes_id AS id, t.tags_id AS parent_id
+FROM episodes_tags t
+         LEFT JOIN episode_availability access ON access.id = t.episodes_id
+         LEFT JOIN episode_roles roles ON roles.id = t.episodes_id
+WHERE t.tags_id = ANY ($1::int[])
+  AND access.published
+  AND access.available_to > now()
+  AND (
+        (roles.roles && $2::varchar[] AND access.available_from < now()) OR
+        (roles.roles_earlyaccess && $2::varchar[])
+    )
+`
+
+type getEpisodeIDsWithTagIDsParams struct {
+	TagIds []int32  `db:"tag_ids" json:"tagIds"`
+	Roles  []string `db:"roles" json:"roles"`
+}
+
+type getEpisodeIDsWithTagIDsRow struct {
+	ID       int32 `db:"id" json:"id"`
+	ParentID int32 `db:"parent_id" json:"parentID"`
+}
+
+func (q *Queries) getEpisodeIDsWithTagIDs(ctx context.Context, arg getEpisodeIDsWithTagIDsParams) ([]getEpisodeIDsWithTagIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getEpisodeIDsWithTagIDs, pq.Array(arg.TagIds), pq.Array(arg.Roles))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []getEpisodeIDsWithTagIDsRow
+	for rows.Next() {
+		var i getEpisodeIDsWithTagIDsRow
+		if err := rows.Scan(&i.ID, &i.ParentID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEpisodeUUIDsWithRoles = `-- name: getEpisodeUUIDsWithRoles :many
 SELECT e.uuid
 FROM episodes e
@@ -332,7 +379,9 @@ SELECT e.id,
        ts.extra_description,
        tags.tags::int[]                                  AS tag_ids,
        assets.duration                                   as duration,
-       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating
+       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating,
+       audience,
+       content_type
 FROM episodes e
          LEFT JOIN ts ON e.id = ts.episodes_id
          LEFT JOIN tags ON tags.episodes_id = e.id
@@ -372,6 +421,8 @@ type getEpisodesRow struct {
 	TagIds                []int32               `db:"tag_ids" json:"tagIds"`
 	Duration              null_v4.Int           `db:"duration" json:"duration"`
 	Agerating             string                `db:"agerating" json:"agerating"`
+	Audience              null_v4.String        `db:"audience" json:"audience"`
+	ContentType           null_v4.String        `db:"content_type" json:"contentType"`
 }
 
 func (q *Queries) getEpisodes(ctx context.Context, dollar_1 []int32) ([]getEpisodesRow, error) {
@@ -409,6 +460,8 @@ func (q *Queries) getEpisodes(ctx context.Context, dollar_1 []int32) ([]getEpiso
 			pq.Array(&i.TagIds),
 			&i.Duration,
 			&i.Agerating,
+			&i.Audience,
+			&i.ContentType,
 		); err != nil {
 			return nil, err
 		}
@@ -526,7 +579,9 @@ SELECT e.id,
        ts.extra_description,
        tags.tags::int[]                                  AS tag_ids,
        assets.duration                                   as duration,
-       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating
+       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating,
+       audience,
+       content_type
 FROM episodes e
          LEFT JOIN ts ON e.id = ts.episodes_id
          LEFT JOIN tags ON tags.episodes_id = e.id
@@ -564,6 +619,8 @@ type listEpisodesRow struct {
 	TagIds                []int32               `db:"tag_ids" json:"tagIds"`
 	Duration              null_v4.Int           `db:"duration" json:"duration"`
 	Agerating             string                `db:"agerating" json:"agerating"`
+	Audience              null_v4.String        `db:"audience" json:"audience"`
+	ContentType           null_v4.String        `db:"content_type" json:"contentType"`
 }
 
 func (q *Queries) listEpisodes(ctx context.Context) ([]listEpisodesRow, error) {
@@ -601,6 +658,8 @@ func (q *Queries) listEpisodes(ctx context.Context) ([]listEpisodesRow, error) {
 			pq.Array(&i.TagIds),
 			&i.Duration,
 			&i.Agerating,
+			&i.Audience,
+			&i.ContentType,
 		); err != nil {
 			return nil, err
 		}
