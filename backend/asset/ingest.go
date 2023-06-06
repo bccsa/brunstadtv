@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/bcc-code/brunstadtv/backend/pubsub"
 	"net/url"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/bcc-code/brunstadtv/backend/pubsub"
 
 	"github.com/bcc-code/brunstadtv/backend/asset/smil"
 	"github.com/bcc-code/brunstadtv/backend/common"
@@ -61,8 +62,9 @@ type config interface {
 type ingestFileMeta struct {
 	Mime             string `json:"mime"`
 	Path             string `json:"path"`
-	AudioLanguge     string `json:"audio_language"`
-	SubtitleLanguage string `json:"subtitle_language"`
+	AudioLanguge     string `json:"audiolanguage"`
+	SubtitleLanguage string `json:"subtitlelanguage"`
+	Resolution       string `json:"resolution"`
 }
 
 type assetIngestJSONMeta struct {
@@ -294,10 +296,11 @@ func Ingest(ctx context.Context, services externalServices, config config, event
 		}
 	}
 
+	fileSizeErrors := []error{}
 	for _, fileMeta := range assetMeta.Files {
 		m := fileMeta
 		target := path.Join(storagePrefix, "mux", path.Base(m.Path))
-		source := path.Join("/", *config.GetIngestBucket(), assetMeta.BasePath, m.Path)
+		source := path.Join(*config.GetIngestBucket(), assetMeta.BasePath, m.Path)
 
 		coi := &s3.CopyObjectInput{
 			Bucket:     config.GetStorageBucket(),
@@ -311,6 +314,18 @@ func Ingest(ctx context.Context, services externalServices, config config, event
 			Key: aws.String(path.Join(assetMeta.BasePath, m.Path)),
 		})
 
+		result, err := s3client.HeadObject(ctx, &s3.HeadObjectInput{
+			Bucket: config.GetIngestBucket(),
+			Key:    aws.String(path.Join(assetMeta.BasePath, m.Path)),
+		})
+
+		fileSizeInBytes := int64(-1)
+		if err == nil {
+			fileSizeInBytes = result.ContentLength
+		} else {
+			fileSizeErrors = append(fileSizeErrors, merry.Wrap(err))
+		}
+
 		af := directus.AssetFile{
 			Path:             target,
 			Storage:          "s3_assets",
@@ -319,10 +334,17 @@ func Ingest(ctx context.Context, services externalServices, config config, event
 			AssetID:          a.ID,
 			AudioLanguage:    m.AudioLanguge,
 			SubtitleLanguage: m.SubtitleLanguage,
+			Resolution:       m.Resolution,
+			Size:             fileSizeInBytes,
 		}
 
 		assetfiles = append(assetfiles, af)
 
+	}
+
+	if len(fileSizeErrors) > 0 {
+		// We just warn here as this can be fixed manually if needed and it is not a critical error
+		log.L.Warn().Errs("fileSizeErrors", fileSizeErrors).Msg("Errors while getting file sizes")
 	}
 
 	// This will copy the objects in parallel and return upon completion of all tasks

@@ -40,7 +40,9 @@ SELECT e.id,
        ts.extra_description,
        tags.tags::int[]                                  AS tag_ids,
        assets.duration                                   as duration,
-       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating
+       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating,
+       audience,
+       content_type
 FROM episodes e
          LEFT JOIN ts ON e.id = ts.episodes_id
          LEFT JOIN tags ON tags.episodes_id = e.id
@@ -95,7 +97,9 @@ SELECT e.id,
        ts.extra_description,
        tags.tags::int[]                                  AS tag_ids,
        assets.duration                                   as duration,
-       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating
+       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating,
+       audience,
+       content_type
 FROM episodes e
          LEFT JOIN ts ON e.id = ts.episodes_id
          LEFT JOIN tags ON tags.episodes_id = e.id
@@ -185,3 +189,16 @@ WHERE e.id = ANY ($1::int[]);
 SELECT e.id as result, e.uuid as original
 FROM episodes e
 WHERE e.uuid = ANY (@ids::uuid[]);
+
+-- name: getEpisodeIDsWithTagIDs :many
+SELECT t.episodes_id AS id, t.tags_id AS parent_id
+FROM episodes_tags t
+         LEFT JOIN episode_availability access ON access.id = t.episodes_id
+         LEFT JOIN episode_roles roles ON roles.id = t.episodes_id
+WHERE t.tags_id = ANY (@tag_ids::int[])
+  AND access.published
+  AND access.available_to > now()
+  AND (
+        (roles.roles && @roles::varchar[] AND access.available_from < now()) OR
+        (roles.roles_earlyaccess && @roles::varchar[])
+    );
