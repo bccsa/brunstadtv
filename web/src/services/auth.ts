@@ -52,20 +52,20 @@ export class Auth {
         const { loginWithRedirect } = useAuth0()
 
         await loginWithRedirect({
-            prompt: silent ? "none" : undefined,
+            authorizationParams: {
+                prompt: silent ? "none" : undefined,
+            },
         })
     }
 
     public static async signOut() {
         const { logout } = useAuth0()
         localStorage.clear()
-        try {
-            return await logout({
+        return await logout({
+            logoutParams: {
                 returnTo: window.location.origin,
-            })
-        } finally {
-            location.reload()
-        }
+            },
+        })
     }
 
     public static loading() {
@@ -74,9 +74,13 @@ export class Auth {
     }
 
     public static async getToken() {
-        const { getAccessTokenSilently, isAuthenticated } = useAuth0()
+        const { getAccessTokenSilently, isAuthenticated, loginWithRedirect } = useAuth0()
         if (isAuthenticated.value) {
-            return await getAccessTokenSilently()
+            try {
+                return await getAccessTokenSilently()
+            } catch {
+                await loginWithRedirect()
+            }
         }
         return null
     }

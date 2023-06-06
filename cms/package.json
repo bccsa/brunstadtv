@@ -4,29 +4,19 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no tests\" && exit 1",
-    "build": "tsc && npm run paths",
-    "paths": "tscpaths -p tsconfig.json -s ./src -o ./extensions",
-    "watch": "tsc-watch --onSuccess 'npm run paths'"
+    "test": "echo \"Error: no tests\" && exit 1"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@google-cloud/pubsub": "^3.0.1",
-    "@rmp135/sql-ts": "^1.13.0",
-    "cloudevents": "^6.0.2",
-    "directus": "^9.13.0",
-    "knex": "^2.0.0",
-    "pg": "^8.7.3",
-    "tedious": "^15.1.2",
-    "uuid": "^9.0.0"
+    "directus": "^10.2.1",
+    "knex": "^2.4.2",
+    "pg": "^8.7.3"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.5",
     "js-yaml": "^4.1.0",
-    "ts-node": "^10.8.1",
-    "tsc-watch": "^5.0.3",
-    "tscpaths": "^0.0.9"
+    "ts-node": "^10.8.1"
   }
 }

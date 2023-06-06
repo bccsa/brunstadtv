@@ -181,18 +181,19 @@ WHERE completed.profile_id = ANY ($1::uuid[])
 WITH total AS (SELECT l.topic_id,
                       COUNT(t.id) task_count
                FROM tasks t
-                        LEFT JOIN lessons l ON l.id = t.lesson_id
+                        JOIN lessons l ON l.id = t.lesson_id
+               WHERE t.status = 'published'
                GROUP BY l.topic_id),
-     completed AS (SELECT t.lesson_id, ta.profile_id, COUNT(t.id) completed_count
+     completed AS (SELECT l.topic_id, ta.profile_id, COUNT(t.id) completed_count
                    FROM tasks t
-                            LEFT JOIN users.taskanswers ta ON ta.task_id = t.id
-                            LEFT JOIN lessons l ON l.id = t.lesson_id
-                   GROUP BY t.lesson_id, ta.profile_id)
-SELECT total.topic_id::uuid as id, completed.profile_id::uuid as parent_id
+                            JOIN "users"."taskanswers" ta ON ta.task_id = t.id
+                            JOIN lessons l ON t.lesson_id = l.id
+                   GROUP BY l.topic_id, ta.profile_id)
+SELECT completed.topic_id::uuid as id, completed.profile_id::uuid as parent_id
 FROM completed
-         LEFT JOIN total ON total.topic_id = completed.lesson_id
-WHERE completed.lesson_id = ANY ($1::uuid[])
-  AND completed.completed_count = total.task_count;
+         JOIN total ON total.topic_id = completed.topic_id
+WHERE completed.profile_id = ANY (@profile_ids::uuid[])
+  AND completed.completed_count >= total.task_count;
 
 -- name: GetAnsweredTasks :many
 SELECT ta.task_id
@@ -235,3 +236,18 @@ WHERE (task_id, profile_id) IN (SELECT ta.task_id, ta.profile_id
                                 WHERE ta.profile_id = @profile_id::uuid
                                   AND t.lesson_id = @lesson_id::uuid
                                   AND t.competition_mode = true);
+
+-- name: getDefaultLessonIDForTopicIDs :many
+WITH completed AS (SELECT DISTINCT ON (task.lesson_id) task.lesson_id
+                   FROM users.taskanswers answer
+                            JOIN tasks task ON task.id = answer.task_id
+                            JOIN lessons lesson ON lesson.id = task.lesson_id
+                   WHERE lesson.topic_id = ANY (@topic_ids::uuid[])
+                     AND answer.profile_id = @profile_id::uuid
+                   ORDER BY task.lesson_id, lesson.sort)
+SELECT DISTINCT ON (l.topic_id) l.topic_id as source, l.id as result
+FROM lessons l
+         LEFT JOIN completed c on c.lesson_id = l.id
+WHERE c.lesson_id IS NULL
+  AND l.topic_id = ANY (@topic_ids::uuid[])
+ORDER BY l.topic_id, l.sort;

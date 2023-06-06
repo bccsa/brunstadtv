@@ -40,6 +40,7 @@ type Show struct {
 	Image                   null.String  `json:"image"`
 	Images                  Images       `json:"images"`
 	DefaultEpisodeBehaviour null.String  `json:"defaultEpisode"`
+	RelatedCollectionID     null.Int     `json:"relatedCollectionId"`
 }
 
 // GetKey returns the key for this item
@@ -124,6 +125,8 @@ type Episode struct {
 	Title                 LocaleString `json:"title"`
 	Description           LocaleString `json:"description"`
 	ExtraDescription      LocaleString `json:"extraDescription"`
+	ContentType           null.String  `json:"contentType"`
+	Audience              null.String  `json:"audience"`
 }
 
 // GetKey returns the key for this item
@@ -157,6 +160,8 @@ type File struct {
 	Path             string      `json:"path"`
 	Storage          string      `json:"storage"`
 	MimeType         string      `json:"mimeType"`
+	Resolution       string      `json:"resolution"`
+	Size             int         `json:"size"`
 }
 
 // Stream item type
@@ -229,6 +234,7 @@ type Section struct {
 // SectionOptions contains options for this section
 type SectionOptions struct {
 	SecondaryTitles    bool
+	MyList             bool
 	ContinueWatching   bool
 	UseContext         bool
 	PrependLiveElement bool
@@ -321,25 +327,25 @@ func (i CalendarEntry) GetKey() int {
 
 // FAQCategory contains the name of the FAQ category
 type FAQCategory struct {
-	ID    int
+	ID    uuid.UUID
 	Title LocaleString
 }
 
 // GetKey returns the key for this item
-func (i FAQCategory) GetKey() int {
+func (i FAQCategory) GetKey() uuid.UUID {
 	return i.ID
 }
 
 // Question contains question data
 type Question struct {
-	ID         int
-	CategoryID int
+	ID         uuid.UUID
+	CategoryID uuid.UUID
 	Question   LocaleString
 	Answer     LocaleString
 }
 
 // GetKey returns the key for this item
-func (i Question) GetKey() int {
+func (i Question) GetKey() uuid.UUID {
 	return i.ID
 }
 
@@ -347,17 +353,30 @@ func (i Question) GetKey() int {
 type Application struct {
 	ID                  int
 	UUID                uuid.UUID
+	GroupID             uuid.UUID
 	Default             bool
 	Code                string
 	ClientVersion       string
 	DefaultPageID       null.Int
 	SearchPageID        null.Int
+	GamesPageID         null.Int
 	RelatedCollectionID null.Int
 	Roles               []string
 }
 
 // GetKey returns the key for this item
 func (i Application) GetKey() int {
+	return i.ID
+}
+
+// ApplicationGroup contains data for
+type ApplicationGroup struct {
+	ID    uuid.UUID
+	Roles []string
+}
+
+// GetKey returns the key for this item
+func (i ApplicationGroup) GetKey() uuid.UUID {
 	return i.ID
 }
 
@@ -405,4 +424,14 @@ type Prompt struct {
 	SurveyID       uuid.NullUUID
 	From           time.Time
 	To             time.Time
+}
+
+// Game contains details for a game
+type Game struct {
+	ID           uuid.UUID `json:"id"`
+	Title        LocaleString
+	Description  LocaleString
+	Images       Images
+	Url          string
+	RequiresAuth bool
 }

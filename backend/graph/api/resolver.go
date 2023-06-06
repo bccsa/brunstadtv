@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"github.com/bcc-code/brunstadtv/backend/auth0"
+	"github.com/bcc-code/brunstadtv/backend/remotecache"
 	"strconv"
 	"sync"
 	"time"
@@ -52,7 +53,6 @@ type Resolver struct {
 	Loaders            *common.BatchLoaders
 	FilteredLoaders    func(ctx context.Context) *common.FilteredLoaders
 	ProfileLoaders     func(ctx context.Context) *common.ProfileLoaders
-	ApplicationLoaders func(ctx context.Context) *common.ApplicationLoaders
 	SearchService      searchProvider
 	EmailService       *email.Service
 	URLSigner          *signing.Signer
@@ -62,6 +62,7 @@ type Resolver struct {
 	AnalyticsIDFactory func(ctx context.Context) string
 	RedirectConfig     redirectConfig
 	AuthClient         *auth0.Client
+	RemoteCache        *remotecache.Client
 }
 
 func (r *Resolver) GetQueries() *sqlc.Queries {
@@ -78,10 +79,6 @@ func (r *Resolver) GetFilteredLoaders(ctx context.Context) *common.FilteredLoade
 
 func (r *Resolver) GetProfileLoaders(ctx context.Context) *common.ProfileLoaders {
 	return r.ProfileLoaders(ctx)
-}
-
-func (r *Resolver) GetApplicationLoaders(ctx context.Context) *common.ApplicationLoaders {
-	return r.ApplicationLoaders(ctx)
 }
 
 func (r *Resolver) GetS3Client() *s3.Client {
@@ -129,7 +126,7 @@ var truncateTime = time.Second * 1
 func withCacheAndTimestamp[r any](ctx context.Context, key string, factory func(ctx context.Context) (r, error), expiry time.Duration, timestamp *string) (r, error) {
 	ctx, span := otel.Tracer("cache").Start(ctx, "with-timestamp")
 	defer span.End()
-	ts, err := timestampFromString(timestamp)
+	ts, err := utils.TimestampFromString(timestamp)
 	if err != nil {
 		var result r
 		return result, err
@@ -179,18 +176,6 @@ func withCacheAndTimestamp[r any](ctx context.Context, key string, factory func(
 	requestCache.Set(key, entry, cache.WithExpiration(expiry))
 
 	return entry.Entry, nil
-}
-
-func timestampFromString(timestamp *string) (*time.Time, error) {
-	var r *time.Time
-	if timestamp != nil {
-		t, err := time.Parse(time.RFC3339, *timestamp)
-		if err != nil {
-			return nil, err
-		}
-		r = &t
-	}
-	return r, nil
 }
 
 type itemLoaders[k comparable, t any] struct {
@@ -254,14 +239,6 @@ func itemsResolverFor[k comparable, kr comparable, t any, r any](ctx context.Con
 	items, err := ls.Item.GetMany(ctx, ids)
 
 	return utils.MapWithCtx(ctx, items, converter), err
-}
-
-func itemsResolverForIntID[t any, r any](ctx context.Context, loaders *itemLoaders[int, t], listLoader *loaders.Loader[int, []*int], id string, converter func(context.Context, *t) r) ([]r, error) {
-	intID, err := strconv.ParseInt(id, 10, 32)
-	if err != nil {
-		return nil, err
-	}
-	return itemsResolverFor(ctx, loaders, listLoader, int(intID), converter)
 }
 
 func imageOrFallback(ctx context.Context, images common.Images, style *model.ImageStyle, fallbacks ...common.Images) *string {
@@ -484,4 +461,44 @@ func (r *Resolver) updateMessage(ctx context.Context, id string, message *string
 		return "", err
 	}
 	return id, err
+}
+
+func (r *Resolver) getUserInfo(ctx context.Context, userID string) (auth0.UserInfo, error) {
+	return memorycache.GetOrSet(ctx, "userinfo:"+userID, func(ctx context.Context) (auth0.UserInfo, error) {
+		ginCtx, _ := utils.GinCtx(ctx)
+		info, err := r.AuthClient.GetUser(ctx, ginCtx.GetString(auth0.CtxUserID))
+		if err != nil {
+			return auth0.UserInfo{}, err
+		}
+		return info, nil
+	}, cache.WithExpiration(time.Second*2))
+}
+
+func uuidItemLoader[T any, R any](
+	ctx context.Context,
+	loader *loaders.Loader[uuid.UUID, *T],
+	converter func(context.Context, *T) *R,
+	idString string) (*R, error) {
+	return itemLoader(ctx, loader, converter, uuid.Parse, idString)
+}
+
+func itemLoader[K comparable, T any, R any](
+	ctx context.Context,
+	loader *loaders.Loader[K, *T],
+	converter func(context.Context, *T) *R,
+	idValidator func(i string) (K, error),
+	idString string,
+) (*R, error) {
+	uid, err := idValidator(idString)
+	if err != nil {
+		return nil, err
+	}
+	i, err := loader.Get(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	if i == nil {
+		return nil, ErrItemNotFound
+	}
+	return converter(ctx, i), nil
 }

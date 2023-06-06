@@ -18,6 +18,7 @@ import (
 	"github.com/bcc-code/brunstadtv/backend/graph/gqltracer"
 	graphpublic "github.com/bcc-code/brunstadtv/backend/graph/public"
 	graphpublicgenerated "github.com/bcc-code/brunstadtv/backend/graph/public/generated"
+	"github.com/bcc-code/brunstadtv/backend/remotecache"
 	"github.com/bcc-code/brunstadtv/backend/search"
 	"github.com/bcc-code/brunstadtv/backend/signing"
 	"github.com/bcc-code/brunstadtv/backend/sqlc"
@@ -40,29 +41,35 @@ func graphqlHandler(
 	s3client *s3.Client,
 	analyticsSalt string,
 	authClient *auth0.Client,
+	remoteCache *remotecache.Client,
 ) gin.HandlerFunc {
 	resolver := graphapi.Resolver{
-		Queries:            queries,
-		Loaders:            loaders,
-		FilteredLoaders:    filteredLoaderFactory(db, queries, loaders.CollectionLoader),
-		ProfileLoaders:     profileLoaderFactory(queries),
-		ApplicationLoaders: applicationLoaderFactory(queries),
-		SearchService:      searchService,
-		EmailService:       emailService,
-		URLSigner:          urlSigner,
-		S3Client:           s3client,
-		APIConfig:          config.CDNConfig,
-		AWSConfig:          config.AWS,
-		RedirectConfig:     config.Redirect,
-		AuthClient:         authClient,
+		Queries:         queries,
+		Loaders:         loaders,
+		FilteredLoaders: filteredLoaderFactory(db, queries, loaders.CollectionLoader),
+		ProfileLoaders:  profileLoaderFactory(queries),
+		SearchService:   searchService,
+		EmailService:    emailService,
+		URLSigner:       urlSigner,
+		S3Client:        s3client,
+		APIConfig:       config.CDNConfig,
+		AWSConfig:       config.AWS,
+		RedirectConfig:  config.Redirect,
+		AuthClient:      authClient,
+		RemoteCache:     remoteCache,
 		AnalyticsIDFactory: func(ctx context.Context) string {
 			ginCtx, err := utils.GinCtx(ctx)
 			p := user.GetProfileFromCtx(ginCtx)
 			if err != nil || p == nil {
 				return "anonymous"
 			}
+			u := user.GetFromCtx(ginCtx)
 
-			return analytics.GenerateID(p.ID, analyticsSalt)
+			aID := analytics.GenerateID(p.ID, analyticsSalt)
+			if u.IsActiveBCC() {
+				return aID
+			}
+			return "ext-" + aID
 		},
 	}
 
@@ -81,6 +88,7 @@ func graphqlHandler(
 			gqlError.Extensions["code"] = code
 		}
 		if userMessage := merry.UserMessage(err); userMessage != "" {
+			log.L.Warn().Err(gqlError).Msg("GraphQL exception: " + userMessage)
 			gqlError.Message = userMessage
 		} else {
 			if _, ok := err.(*gqlerror.Error); ok {

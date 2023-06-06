@@ -1,21 +1,20 @@
 .PHONY: run init reset s
 
 run:
-	npx directus start
+	pnpm directus start
 
 install:
-	npm ci
-	cd ./custom && make install
+	pnpm i
+	cd ../packages/directus-modules && make install
 
 build:
 	rm -rf ./extensions
-	npm run build
-	cd ./custom && make build
+	#npm run build
+	cd ../packages/directus-modules && make build
 
 init:
 	make install
 	make build
-	cd ./custom && make init
 
 reset:
 	make init

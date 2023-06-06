@@ -1,6 +1,7 @@
 package asset
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 
@@ -102,4 +103,25 @@ func TestGetLanguagesFromVideoElement(t *testing.T) {
 
 	langs = GetLanguagesFromVideoElement(smilObj.Body.Switch.Videos[3])
 	assert.Equal(t, []directus.AssetStreamLanguage{}, langs)
+}
+
+func TestParseJson(t *testing.T) {
+	bytes, err := os.ReadFile("./testdata/001.json")
+	assert.NoError(t, err)
+	obj := assetIngestJSONMeta{}
+	err = json.Unmarshal(bytes, &obj)
+	assert.NoError(t, err)
+}
+
+func TestParseJson2(t *testing.T) {
+	bytes, err := os.ReadFile("./testdata/002.json")
+	assert.NoError(t, err)
+	obj := assetIngestJSONMeta{}
+	err = json.Unmarshal(bytes, &obj)
+	assert.NoError(t, err)
+
+	for _, file := range obj.Files {
+		assert.Equal(t, "1920x1080", file.Resolution)
+		assert.NotEmpty(t, file.AudioLanguge)
+	}
 }

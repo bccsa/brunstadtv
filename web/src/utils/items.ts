@@ -1,13 +1,16 @@
 import {
     GetSectionQuery,
     SectionItemFragment,
-    GetStudyTopicLessonStatusesQuery,
-    GetStudyTopicLessonStatusesDocument,
-    GetStudyTopicLessonStatusesQueryVariables,
+    GetCalendarDayQuery,
+    GetDefaultEpisodeForTopicDocument,
+    GetDefaultEpisodeForTopicQuery,
+    GetDefaultEpisodeForTopicQueryVariables,
+    GetDefaultEpisodeForShowQuery,
+    GetDefaultEpisodeForShowQueryVariables,
+    GetDefaultEpisodeForShowDocument,
 } from "@/graph/generated"
 import router from "@/router"
 import { analytics, Page } from "@/services/analytics"
-import { createRequest } from "@urql/vue"
 import client from "@/graph/client"
 
 export const goToEpisode = (
@@ -46,24 +49,15 @@ export const goToPage = (code: string) => {
 
 export const goToStudyTopic = async (id: string) => {
     // TODO: nothing is as permanent as a temporary solution lol
+    // although things can be improved :) 
     const result = await client
         .query<
-            GetStudyTopicLessonStatusesQuery,
-            GetStudyTopicLessonStatusesQueryVariables
-        >(GetStudyTopicLessonStatusesDocument, { first: 100, id: id })
+            GetDefaultEpisodeForTopicQuery,
+            GetDefaultEpisodeForTopicQueryVariables
+        >(GetDefaultEpisodeForTopicDocument, { id: id })
         .toPromise()
-    const uncompletedLessonWithEpisode =
-        result.data?.studyTopic.lessons.items.find(
-            (el) =>
-                (console.log(el.episodes.items) as any) ||
-                (!el.completed && el.episodes.items[0]?.locked == false)
-        )
-    var episodeId = uncompletedLessonWithEpisode?.episodes.items[0]?.id
-    console.log(uncompletedLessonWithEpisode)
-    console.log(episodeId)
-    episodeId ??=
-        result.data?.studyTopic.lessons.items[0]?.episodes.items[0]?.id
-    if (episodeId == null) {
+    const episodeId = result.data?.studyTopic.defaultLesson.defaultEpisode?.id
+    if (!episodeId) {
         throw Error(`Failed finding an episode to navigate to for topic ${id}`)
     }
 
@@ -75,7 +69,26 @@ export const goToStudyTopic = async (id: string) => {
     })
 }
 
-export const goToSectionItem = (
+export const goToShow = async (id: string) => {
+    // TODO: nothing is as permanent as a temporary solution lol
+    // although things can be improved :) 
+    const result = await client
+        .query<
+            GetDefaultEpisodeForShowQuery,
+            GetDefaultEpisodeForShowQueryVariables
+        >(GetDefaultEpisodeForShowDocument, { id: id })
+        .toPromise()
+    const episodeId = result.data?.show.defaultEpisode.id
+
+    router.push({
+        name: "episode-page",
+        params: {
+            episodeId,
+        },
+    })
+}
+
+export const goToSectionItem = async (
     item: {
         index: number
         item: SectionItemFragment
@@ -109,13 +122,13 @@ export const goToSectionItem = (
             goToEpisode(item.item.id, section?.options)
             break
         case "Show":
-            goToEpisode(item.item.item.defaultEpisode.id)
+            await goToShow(item.item.item.id)
             break
         case "Page":
             goToPage(item.item.item.code)
             break
         case "StudyTopic":
-            goToStudyTopic(item.item.item.id)
+            await goToStudyTopic(item.item.item.id)
             break
     }
 }
@@ -124,8 +137,35 @@ export const comingSoon = (item: SectionItemFragment) => {
     switch (item.item.__typename) {
         case "Episode":
             return (
-                item.item.locked && new Date(item.item.publishDate).getTime() > new Date().getTime()
+                item.item.locked &&
+                new Date(item.item.publishDate).getTime() > new Date().getTime()
             )
+    }
+    return false
+}
+
+export const isLive = (
+    item: SectionItemFragment,
+    currentDay: NonNullable<GetCalendarDayQuery["calendar"]>["day"] | null
+) => {
+    if (!currentDay) return false
+    switch (item.item.__typename) {
+        case "Episode":
+            if (!item.item.locked) return false
+            for (const e of currentDay.entries ?? []) {
+                if (
+                    e.__typename === "EpisodeCalendarEntry" &&
+                    e.episode?.id === item.item.id
+                ) {
+                    const now = new Date().getTime()
+                    const start = new Date(e.start).getTime()
+                    const end = new Date(e.end).getTime()
+                    if (start <= now && end >= now) {
+                        return true
+                    }
+                    console.log(now, start, end)
+                }
+            }
     }
     return false
 }

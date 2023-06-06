@@ -5,9 +5,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/bcc-code/brunstadtv/backend/applications"
 	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/brunstadtv/backend/memorycache"
 	"github.com/bcc-code/brunstadtv/backend/remotecache"
+	"github.com/bcc-code/brunstadtv/backend/user/middleware"
 	"github.com/bsm/redislock"
 	"github.com/gin-contrib/pprof"
 	"github.com/sony/gobreaker"
@@ -85,30 +88,6 @@ func profileLoaderFactory(queries *sqlc.Queries) func(ctx context.Context) *comm
 	}
 }
 
-func applicationLoaderFactory(queries *sqlc.Queries) func(ctx context.Context) *common.ApplicationLoaders {
-	return func(ctx context.Context) *common.ApplicationLoaders {
-		ginCtx, err := utils.GinCtx(ctx)
-		if err != nil {
-			log.L.Error().Err(err).Send()
-			return nil
-		}
-		a, err := applications.GetFromCtx(ginCtx)
-		if err != nil {
-			log.L.Error().Err(err).Send()
-			return nil
-		}
-		if a == nil {
-			return nil
-		}
-		if ls := ginCtx.Value(applicationLoadersCtxKey); ls != nil {
-			return ls.(*common.ApplicationLoaders)
-		}
-		ls := getApplicationLoaders(queries, a.UUID)
-		ginCtx.Set(applicationLoadersCtxKey, ls)
-		return ls
-	}
-}
-
 // Defining the Playground handler
 func playgroundHandler() gin.HandlerFunc {
 	h := playground.Handler("GraphQL", "/query")
@@ -118,15 +97,10 @@ func playgroundHandler() gin.HandlerFunc {
 	}
 }
 
-var apps []common.Application
-
 func getApplications(ctx context.Context, queries *sqlc.Queries) []common.Application {
-	if apps == nil {
-		stored, err := queries.ListApplications(ctx)
-		if err != nil {
-			log.L.Panic().Err(err).Send()
-		}
-		apps = stored
+	apps, err := memorycache.GetOrSet(ctx, "applications", queries.ListApplications, cache.WithExpiration(time.Minute*2))
+	if err != nil {
+		log.L.Panic().Err(err).Send()
 	}
 	return apps
 }
@@ -179,11 +153,14 @@ func main() {
 
 	log.L.Info().Msg("Setting up tracing!")
 	utils.MustSetupTracing("BTV-API", config.Tracing)
+
 	ctx, span := otel.Tracer("api/core").Start(ctx, "init")
 	db, dbChan := utils.MustCreateDBClient(ctx, config.DB)
+
 	redisClient, rdbChan := utils.MustCreateRedisClient(ctx, config.Redis)
 	locker := redislock.New(redisClient)
 	remoteCache := remotecache.New(redisClient, locker)
+
 	jwkChan := lo.Async(func() gin.HandlerFunc {
 		handler := jwksHandler(config.Redirect)
 		log.L.Info().Msg("JWK generated")
@@ -236,7 +213,8 @@ func main() {
 
 	r.Use(otelgin.Middleware("api"))
 	r.Use(authClient.ValidateToken())
-	r.Use(user.NewUserMiddleware(queries, remoteCache, ls, authClient))
+	r.Use(applications.ApplicationMiddleware(applicationFactory(queries)))
+	r.Use(middleware.NewUserMiddleware(queries, remoteCache, ls, authClient))
 	if environment.Test() {
 		// Get the user object from headers
 		r.Use(func(ctx *gin.Context) {
@@ -253,8 +231,7 @@ func main() {
 			}
 		})
 	}
-	r.Use(user.NewProfileMiddleware(queries, remoteCache))
-	r.Use(applications.ApplicationMiddleware(applicationFactory(queries)))
+	r.Use(middleware.NewProfileMiddleware(queries, remoteCache))
 	r.Use(applications.RoleMiddleware())
 	r.Use(ratelimit.Middleware())
 
@@ -269,6 +246,7 @@ func main() {
 		s3Client,
 		config.AnalyticsSalt,
 		authClient,
+		remoteCache,
 	))
 	r.GET("/", playgroundHandler())
 	r.POST("/admin", adminGraphqlHandler(config, db, queries, ls))

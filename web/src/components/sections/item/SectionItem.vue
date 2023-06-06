@@ -1,9 +1,15 @@
 <template>
     <div class="relative">
+        <Pill
+            color="bg-red"
+            class="absolute -top-1 -right-1 pointer-events-none"
+            v-if="isLive(i, currentDay)"
+            >{{ $t("episode.liveNow") }}</Pill
+        >
         <NewPill
             class="absolute -top-1 -right-1 pointer-events-none"
             :item="i"
-            v-if="!comingSoon(i)"
+            v-else-if="!comingSoon(i)"
         ></NewPill>
         <Pill class="absolute -top-1 -right-1 pointer-events-none" v-else>{{
             $t("episode.comingSoon")
@@ -11,11 +17,17 @@
         <div
             class="flex flex-col mt-2 transition"
             :class="{
-                'cursor-pointer': !comingSoon(i),
-                'pointer-events-none': comingSoon(i),
+                'cursor-pointer': !comingSoon(i) || isLive(i, currentDay),
+                'pointer-events-none': comingSoon(i) && !isLive(i, currentDay),
                 'opacity-50': clicked,
             }"
-            @click="!comingSoon(i) ? click() : undefined"
+            @click="
+                isLive(i, currentDay)
+                    ? $router.push('/live')
+                    : !comingSoon(i)
+                    ? click()
+                    : undefined
+            "
         >
             <div
                 class="relative mb-1 rounded-md w-full overflow-hidden hover:opacity-90 transition"
@@ -37,7 +49,11 @@
                     :item="i.item"
                 />
                 <div
-                    v-if="comingSoon(i) && i.item.__typename === 'Episode'"
+                    v-if="
+                        !isLive(i, currentDay) &&
+                        comingSoon(i) &&
+                        i.item.__typename === 'Episode'
+                    "
                     class="absolute flex top-0 h-full w-full bg-black bg-opacity-80"
                 >
                     <div
@@ -66,8 +82,9 @@
 import ProgressBar from "@/components/episodes/ProgressBar.vue"
 import Image from "@/components/Image.vue"
 import Loader from "@/components/Loader.vue"
+import { useCalendar } from "@/composables/calendar"
 import { SectionItemFragment } from "@/graph/generated"
-import { comingSoon } from "@/utils/items"
+import { comingSoon, isLive } from "@/utils/items"
 import { LockClosedIcon } from "@heroicons/vue/24/solid"
 import { computed, ref } from "vue"
 import NewPill from "./NewPill.vue"
@@ -86,6 +103,8 @@ const props = withDefaults(
     }>(),
     { secondaryTitles: false }
 )
+
+const { currentDay } = useCalendar()
 
 const clicked = ref(false)
 

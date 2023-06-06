@@ -40,7 +40,9 @@ SELECT e.id,
        ts.extra_description,
        tags.tags::int[]                                  AS tag_ids,
        assets.duration                                   as duration,
-       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating
+       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating,
+       audience,
+       content_type
 FROM episodes e
          LEFT JOIN ts ON e.id = ts.episodes_id
          LEFT JOIN tags ON tags.episodes_id = e.id
@@ -57,6 +59,7 @@ WITH ts AS (SELECT episodes_id,
                    json_object_agg(languages_code, description)       AS description,
                    json_object_agg(languages_code, extra_description) AS extra_description
             FROM episodes_translations
+            WHERE episodes_id = ANY ($1::int[])
             GROUP BY episodes_id),
      tags AS (SELECT episodes_id,
                      array_agg(tags_id) AS tags
@@ -64,7 +67,8 @@ WITH ts AS (SELECT episodes_id,
               GROUP BY episodes_id),
      images AS (WITH images AS (SELECT episode_id, style, language, filename_disk
                                 FROM images img
-                                         JOIN directus_files df on img.file = df.id)
+                                         JOIN directus_files df on img.file = df.id
+                                WHERE episode_id = ANY ($1::int[]))
                 SELECT episode_id, json_agg(images) as json
                 FROM images
                 GROUP BY episode_id)
@@ -93,7 +97,9 @@ SELECT e.id,
        ts.extra_description,
        tags.tags::int[]                                  AS tag_ids,
        assets.duration                                   as duration,
-       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating
+       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating,
+       audience,
+       content_type
 FROM episodes e
          LEFT JOIN ts ON e.id = ts.episodes_id
          LEFT JOIN tags ON tags.episodes_id = e.id
@@ -183,3 +189,16 @@ WHERE e.id = ANY ($1::int[]);
 SELECT e.id as result, e.uuid as original
 FROM episodes e
 WHERE e.uuid = ANY (@ids::uuid[]);
+
+-- name: getEpisodeIDsWithTagIDs :many
+SELECT t.episodes_id AS id, t.tags_id AS parent_id
+FROM episodes_tags t
+         LEFT JOIN episode_availability access ON access.id = t.episodes_id
+         LEFT JOIN episode_roles roles ON roles.id = t.episodes_id
+WHERE t.tags_id = ANY (@tag_ids::int[])
+  AND access.published
+  AND access.available_to > now()
+  AND (
+        (roles.roles && @roles::varchar[] AND access.available_from < now()) OR
+        (roles.roles_earlyaccess && @roles::varchar[])
+    );
