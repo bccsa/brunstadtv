@@ -51,6 +51,8 @@ export class Auth {
     public static async signIn(silent?: boolean) {
         const { loginWithRedirect } = useAuth0()
 
+        // btv_box
+        if (localStorage.getItem("isOnline") == "true")
         await loginWithRedirect({
             authorizationParams: {
                 prompt: silent ? "none" : undefined,
@@ -75,11 +77,17 @@ export class Auth {
 
     public static async getToken() {
         const { getAccessTokenSilently, isAuthenticated, loginWithRedirect } = useAuth0()
+        // btv_box
+        if (localStorage.getItem("isOnline") == "true")
         if (isAuthenticated.value) {
             try {
                 return await getAccessTokenSilently()
             } catch {
-                await loginWithRedirect()
+                // btv_box (delay redirect with 15 sec to allow for isOnline check)
+                setTimeout(async () => {
+                    if (localStorage.getItem("isOnline") == "true")
+                    await loginWithRedirect()
+                }, 15000)
             }
         }
         return null
