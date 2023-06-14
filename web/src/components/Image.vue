@@ -1,12 +1,12 @@
 <template>
     <div
-        class="bg-primary-light overflow-hidden"
+        class="bg-primary-light overflow-hidden h-full"
         :class="[!loaded ? 'border-1 border border-slate-700 opacity-50' : '']"
         ref="imageContainer"
     >
         <img
             ref="image"
-            class="object-cover w-full transition"
+            class="object-cover h-full w-full transition" 
             :class="[!loaded ? 'opacity-0' : 'opacity-100']"
             :height="effectiveHeight"
             :width="effectiveWidth"
@@ -44,8 +44,8 @@ onMounted(() => {
         }
         const parent = imageContainer.value
         if (parent) {
-            dimensions.height = parent.clientHeight
-            dimensions.width = parent.clientWidth
+            dimensions.height = parent.clientHeight || 540 // btv_box: set smallest height and width for parant with height 0 (used for preloading)
+            dimensions.width = parent.clientWidth || 960 // btv_box: set smallest height and width for parant with height 0 (used for preloading)
         }
         parentDimensions.value = dimensions
         const i = image.value
@@ -65,7 +65,7 @@ onMounted(() => {
 const effectiveSrc = computed(() => {
     return props.src
         ? props.src +
-              `?w=${effectiveWidth.value}&h=${effectiveHeight.value}&fit=crop&crop=faces`
+              `?w=${960}&h=${540}&fit=crop&crop=faces`
         : "null"
 })
 
