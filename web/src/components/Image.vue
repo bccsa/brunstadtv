@@ -65,7 +65,7 @@ onMounted(() => {
 const effectiveSrc = computed(() => {
     return props.src
         ? props.src +
-              `?w=${960}&h=${540}&fit=crop&crop=faces`
+              `?w=${effectiveWidth.value}&h=${effectiveHeight.value}&fit=crop&crop=faces`
         : "null"
 })
 
