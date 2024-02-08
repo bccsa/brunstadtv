@@ -2,10 +2,26 @@
 import { provideClient } from "@urql/vue"
 import client from "@/graph/client"
 import { useAuth } from "@/services/auth"
+import { watch } from "vue"
+import { useRouter } from "vue-router"
 
 const { loading } = useAuth()
 
 provideClient(client)
+
+const router = useRouter()
+
+const checkRedirect = () => {
+    const redirect = localStorage.getItem("redirect")
+    if (redirect) {
+        localStorage.removeItem("redirect")
+        router.push(redirect)
+    }
+}
+
+watch(() => loading.value, checkRedirect)
+
+checkRedirect()
 </script>
 
 <template>
@@ -16,6 +32,7 @@ provideClient(client)
 /* width */
 ::-webkit-scrollbar {
     width: 10px;
+    background: var(--color-background-1);
 }
 
 /* Track */
@@ -26,13 +43,13 @@ provideClient(client)
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
-    background: #888;
+    background: var(--color-label-4);
     width: 5px;
     border-radius: 10px;
 }
 
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: var(--color-label-3);
 }
 </style>

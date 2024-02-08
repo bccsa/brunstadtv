@@ -5,6 +5,7 @@
         "logout": "Logg ut",
         "stayLoggedOut": "Forbli utlogget",
         "cancel": "Avbryt",
+        "accept": "Godta",
         "submit": "Send inn",
         "back": "Tilbake",
         "next": "Neste",
@@ -15,7 +16,13 @@
         "send": "Send",
         "start": "Start",
         "skip": "Hopp over",
-        "join": "Bli med"
+        "join": "Bli med",
+        "open": "Åpne"
+    },
+    "download": {
+        "resolution": "Oppløsning",
+        "language": "Språk",
+        "progress": "Fremdrift"
     },
     "error": {
         "couldntSendYourMessage": "Kunne ikke sende meldingen din",
@@ -72,7 +79,9 @@
         }
     },
     "live": {
-        "now": "Nå"
+        "now": "Nå",
+        "title": "Ny app for direktesending",
+        "description": "Vi beklager! Du kan ikke lenger se direktesendinger på dette nettstedet. Klikk på lenken for å gå til den nye løsningen!"
     },
     "calendar": {
         "noScheduledEvents": "Ingen planlagte sendinger",
@@ -92,6 +101,7 @@
         "title": "Tittel",
         "subject": "Emne",
         "content": "Innhold",
+        "faq": "FAQ",
         "describeIssue": "Beskriv problemet ditt i detalj."
     },
     "study": {
@@ -140,7 +150,11 @@
         "information": "BCC Media er en mediestiftelse i BCC-forbundet (https://bcc.no) som produserer og og distribuerer innhold med positive og kristne verdier.\n\nBCC Media er registrert kringkaster og følger reglene i kringkastingsloven. Tilsynsorgan for denne loven er Medietilsynet (https://medietilsynet.no/).",
         "headOffice": "Hovedkontor",
         "contactUs": "Kontakt oss",
-        "downloadApp": "Last ned vår app"
+        "downloadApp": "Last ned vår app",
+        "termsOfUse": "Vilkår for bruk"
+    },
+    "terms": {
+        "byDownloadingYouAcceptTerms": "Ved å laste ned denne videoen godtar du våre [vilkår for bruk](https://bcc.media/terms-of-use) og [personvernregler](https://bcc.media/privacy)."
     },
     "share": {
         "title": "Del",
@@ -159,5 +173,33 @@
     "thankYou": "Tusen takk!",
     "yourResponseHasBeenSubmitted": "Ditt svar er sendt inn.",
     "sending": "Sender",
-    "defaultInputPlaceholder": "Begynn å skrive her..."
+    "defaultInputPlaceholder": "Begynn å skrive her...",
+    "requests": {
+        "name": "Ditt navn",
+        "email": "E-post",
+        "role": "Din rolle",
+        "what": "Materiale som forespørres",
+        "how": "Hvordan skal materialet brukes?",
+        "howDescription": "Vist del/hele, redigert...",
+        "where": "Hvor skal materialet brukes?",
+        "when": "Når skal materialet brukes?",
+        "clear": "Tøm",
+        "send": "Send",
+        "editor": "Redaktør",
+        "director": "Regissør",
+        "producer": "Produsent",
+        "eventCamp": "Event/Camp",
+        "local": "Samling lokalt",
+        "mediaResponsible": "Medieansvarlig",
+        "other": "Annet",
+        "confirmSend": "Send forespørsel om materiale?",
+        "title": "Forespørsel om materiale",
+        "description": "Skjema for forespørsel om lyd-, bilde- og videomateriale fra BCC Media",
+        "receitTitle": "Forespørsel mottatt",
+        "confirmAgenda": "Jeg bekrefter at materiale kun skal brukes til avtalt formål.",
+        "receitDescription": "Vårt team vil kontakte deg innen 7 arbeidsdager. Et automatisk svar er sendt til din e-post."
+    },
+    "shorts": {
+        "watchOnOurApp": "Last ned mobilappen for å se shorts."
+    }
 }

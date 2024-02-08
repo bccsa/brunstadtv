@@ -3,12 +3,13 @@ package graph
 import (
 	"context"
 	"database/sql"
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/graph/admin/model"
-	"github.com/bcc-code/brunstadtv/backend/items/collection"
-	"github.com/bcc-code/brunstadtv/backend/sqlc"
-	"github.com/bcc-code/brunstadtv/backend/user"
-	"github.com/bcc-code/brunstadtv/backend/utils"
+
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/graph/admin/model"
+	"github.com/bcc-code/bcc-media-platform/backend/items/collection"
+	"github.com/bcc-code/bcc-media-platform/backend/sqlc"
+	"github.com/bcc-code/bcc-media-platform/backend/user"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 )
@@ -60,6 +61,12 @@ func (r *previewResolver) getItemsForFilter(ctx context.Context, filter common.F
 		}))
 	}
 
+	if ids := getIDs("shorts", identifiers); len(ids) > 0 {
+		r.Loaders.ShortLoader.LoadMany(ctx, lo.Map(ids, func(i string, _ int) uuid.UUID {
+			return utils.AsUuid(i)
+		}))
+	}
+
 	for _, e := range identifiers {
 		switch e.Collection {
 		case "shows":
@@ -99,6 +106,16 @@ func (r *previewResolver) getItemsForFilter(ctx context.Context, filter common.F
 			}
 			items = append(items, &model.CollectionItem{
 				Collection: model.CollectionGames,
+				ID:         e.ID,
+				Title:      i.Title.Get(languages),
+			})
+		case "shorts":
+			i, err := r.Loaders.ShortLoader.Get(ctx, utils.AsUuid(e.ID))
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, &model.CollectionItem{
+				Collection: model.CollectionShorts,
 				ID:         e.ID,
 				Title:      i.Title.Get(languages),
 			})

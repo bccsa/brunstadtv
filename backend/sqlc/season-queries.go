@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v4"
 )
@@ -107,7 +107,6 @@ func (q *Queries) GetPermissionsForSeasons(ctx context.Context, ids []int) ([]co
 	return lo.Map(items, func(i getPermissionsForSeasonsRow, _ int) common.Permissions[int] {
 		return common.Permissions[int]{
 			ItemID: int(i.ID),
-			Type:   common.TypeSeason,
 			Availability: common.Availability{
 				Unlisted:  i.Unlisted,
 				Published: i.Published,

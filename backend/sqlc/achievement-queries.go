@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v4"
@@ -31,8 +31,8 @@ func (q *Queries) GetAchievements(ctx context.Context, ids []uuid.UUID) ([]commo
 		return common.Achievement{
 			ID:          i.ID,
 			GroupID:     i.GroupID,
-			Title:       toLocaleString(i.Title.RawMessage, null.StringFrom(i.OriginalTitle)),
-			Description: toLocaleString(i.Description.RawMessage, i.OriginalDescription),
+			Title:       toLocaleString(i.Title.RawMessage, i.OriginalTitle),
+			Description: toLocaleString(i.Description.RawMessage, i.OriginalDescription.String),
 			Conditions:  unmarshalTo[[]common.AchievementCondition](i.Conditions.RawMessage),
 			Images:      res,
 		}
@@ -87,7 +87,7 @@ func (q *Queries) GetAchievementGroups(ctx context.Context, ids []uuid.UUID) ([]
 	return lo.Map(rows, func(i getAchievementGroupsRow, _ int) common.AchievementGroup {
 		return common.AchievementGroup{
 			ID:    i.ID,
-			Title: toLocaleString(i.Title.RawMessage, i.OriginalTitle),
+			Title: toLocaleString(i.Title.RawMessage, i.OriginalTitle.String),
 		}
 	}), nil
 }

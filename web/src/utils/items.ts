@@ -8,6 +8,10 @@ import {
     GetDefaultEpisodeForShowQuery,
     GetDefaultEpisodeForShowQueryVariables,
     GetDefaultEpisodeForShowDocument,
+    useGetPlaylistEpisodeQuery,
+    GetPlaylistEpisodeQuery,
+    GetPlaylistEpisodeQueryVariables,
+    GetPlaylistEpisodeDocument,
 } from "@/graph/generated"
 import router from "@/router"
 import { analytics, Page } from "@/services/analytics"
@@ -38,6 +42,27 @@ export const goToEpisode = (
     }
 }
 
+export const goToPlaylist = async (playlistId: string) => {
+    const result = await client
+        .query<GetPlaylistEpisodeQuery, GetPlaylistEpisodeQueryVariables>(
+            GetPlaylistEpisodeDocument,
+            { id: playlistId }
+        )
+        .toPromise()
+    for (const i of result.data?.playlist.items.items ?? []) {
+        if (i.__typename === "Episode") {
+            router.push({
+                name: "playlist-episode",
+                params: {
+                    playlistId,
+                    episodeId: i.id,
+                },
+            })
+            return
+        }
+    }
+}
+
 export const goToPage = (code: string) => {
     router.push({
         name: "page",
@@ -49,7 +74,7 @@ export const goToPage = (code: string) => {
 
 export const goToStudyTopic = async (id: string) => {
     // TODO: nothing is as permanent as a temporary solution lol
-    // although things can be improved :) 
+    // although things can be improved :)
     const result = await client
         .query<
             GetDefaultEpisodeForTopicQuery,
@@ -71,7 +96,7 @@ export const goToStudyTopic = async (id: string) => {
 
 export const goToShow = async (id: string) => {
     // TODO: nothing is as permanent as a temporary solution lol
-    // although things can be improved :) 
+    // although things can be improved :)
     const result = await client
         .query<
             GetDefaultEpisodeForShowQuery,
@@ -129,6 +154,9 @@ export const goToSectionItem = async (
             break
         case "StudyTopic":
             await goToStudyTopic(item.item.item.id)
+            break
+        case "Playlist":
+            await goToPlaylist(item.item.item.id)
             break
     }
 }

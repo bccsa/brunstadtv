@@ -8,18 +8,18 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bcc-code/brunstadtv/backend/remotecache"
-	"github.com/bcc-code/brunstadtv/backend/utils"
+	"github.com/bcc-code/bcc-media-platform/backend/remotecache"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 	sns "github.com/robbiet480/go.sns"
 
 	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/ansel1/merry/v2"
-	"github.com/bcc-code/brunstadtv/backend/asset"
-	"github.com/bcc-code/brunstadtv/backend/crowdin"
-	"github.com/bcc-code/brunstadtv/backend/events"
-	externalevents "github.com/bcc-code/brunstadtv/backend/external-events"
-	"github.com/bcc-code/brunstadtv/backend/maintenance"
-	"github.com/bcc-code/brunstadtv/backend/pubsub"
+	"github.com/bcc-code/bcc-media-platform/backend/asset"
+	"github.com/bcc-code/bcc-media-platform/backend/crowdin"
+	"github.com/bcc-code/bcc-media-platform/backend/events"
+	externalevents "github.com/bcc-code/bcc-media-platform/backend/external-events"
+	"github.com/bcc-code/bcc-media-platform/backend/maintenance"
+	"github.com/bcc-code/bcc-media-platform/backend/pubsub"
 	"github.com/bcc-code/mediabank-bridge/log"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/davecgh/go-spew/spew"
@@ -131,13 +131,13 @@ func (s Server) ProcessMessage(c *gin.Context) {
 	case events.TypeRefreshView:
 		err = maintenance.RefreshView(ctx, s.services, e)
 	case events.TypeDirectusEvent:
-		err = s.services.GetDirectusEventHandler().ProcessCloudEvent(ctx, e)
+		err = s.services.GetEventHandler().ProcessCloudEvent(ctx, e)
 	case events.TypeSearchReindex:
 		err = s.services.GetSearchService().Reindex(ctx)
 	case events.TypeExportAnswersToBQ:
 		err = s.services.GetStatisticHandler().HandleAnswerExportToBQ(ctx)
 	case events.TypeTranslationsSync:
-		err = s.runIfNotLocked(ctx, fmt.Sprintf("event:%s", e.Type()), func() error {
+		err = s.runIfNotLocked(ctx, fmt.Sprintf("event:%s:%s", e.Type(), e.ID()), func() error {
 			return crowdin.HandleEvent(ctx, s.services, e)
 		})
 	default:

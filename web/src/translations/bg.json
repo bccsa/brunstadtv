@@ -5,6 +5,7 @@
         "logout": "",
         "stayLoggedOut": "",
         "cancel": "",
+        "accept": "",
         "submit": "",
         "back": "",
         "next": "",
@@ -15,7 +16,13 @@
         "send": "",
         "start": "",
         "skip": "",
-        "join": ""
+        "join": "",
+        "open": ""
+    },
+    "download": {
+        "resolution": "",
+        "language": "",
+        "progress": ""
     },
     "error": {
         "couldntSendYourMessage": "",
@@ -72,7 +79,9 @@
         }
     },
     "live": {
-        "now": ""
+        "now": "",
+        "title": "",
+        "description": ""
     },
     "calendar": {
         "noScheduledEvents": "",
@@ -92,6 +101,7 @@
         "title": "",
         "subject": "",
         "content": "",
+        "faq": "",
         "describeIssue": ""
     },
     "study": {
@@ -140,7 +150,11 @@
         "information": "",
         "headOffice": "",
         "contactUs": "",
-        "downloadApp": ""
+        "downloadApp": "",
+        "termsOfUse": ""
+    },
+    "terms": {
+        "byDownloadingYouAcceptTerms": ""
     },
     "share": {
         "title": "",
@@ -159,5 +173,33 @@
     "thankYou": "",
     "yourResponseHasBeenSubmitted": "",
     "sending": "",
-    "defaultInputPlaceholder": ""
+    "defaultInputPlaceholder": "",
+    "requests": {
+        "name": "",
+        "email": "",
+        "role": "",
+        "what": "",
+        "how": "",
+        "howDescription": "",
+        "where": "",
+        "when": "",
+        "clear": "",
+        "send": "",
+        "editor": "",
+        "director": "",
+        "producer": "",
+        "eventCamp": "",
+        "local": "",
+        "mediaResponsible": "",
+        "other": "",
+        "confirmSend": "",
+        "title": "",
+        "description": "",
+        "receitTitle": "",
+        "confirmAgenda": "",
+        "receitDescription": ""
+    },
+    "shorts": {
+        "watchOnOurApp": ""
+    }
 }

@@ -3,7 +3,7 @@ package sqlc
 import (
 	"context"
 	"encoding/json"
-	"github.com/bcc-code/brunstadtv/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v4"
@@ -34,6 +34,7 @@ func (q *Queries) GetGames(ctx context.Context, ids []uuid.UUID) ([]common.Game,
 			RequiresAuth: i.RequiresAuthentication,
 			Title:        title,
 			Description:  description,
+			Images:       q.getImages(i.Images.RawMessage),
 		}
 	}), nil
 }

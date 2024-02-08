@@ -4,11 +4,11 @@ FROM usergroups
 WHERE $1::text = ANY (string_to_array(emails, E'\n'));
 
 -- name: GetRoles :many
-SELECT code, string_to_array(emails, E'\n')::text[] as emails
+SELECT code, explicitly_available, string_to_array(emails, E'\n')::text[] as emails
 FROM usergroups;
 
 -- name: GetRolesWithCode :many
-SELECT code, string_to_array(emails, E'\n')::text[] as emails
+SELECT code, explicitly_available, string_to_array(emails, E'\n')::text[] as emails
 FROM usergroups
 WHERE code = ANY ($1::varchar[]);
 
@@ -43,3 +43,6 @@ ON CONFLICT (id) DO UPDATE SET email          = excluded.email,
                                age_group      = excluded.age_group,
                                gender         = excluded.gender,
                                updated_at     = NOW();
+
+-- name: GetUserIDsWithRoles :many
+SELECT id FROM users.users WHERE roles && @roles::varchar[];

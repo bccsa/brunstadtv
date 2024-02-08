@@ -21,10 +21,8 @@ type CalendarEntry interface {
 type CollectionItem interface {
 	IsCollectionItem()
 	GetID() string
-	GetSort() int
 	GetTitle() string
-	GetImageURL() *string
-	GetImages() []*Image
+	GetDescription() *string
 }
 
 type EpisodeContextUnion interface {
@@ -53,6 +51,15 @@ type ItemSection interface {
 	GetItems() *SectionItemPagination
 }
 
+type MediaItem interface {
+	IsMediaItem()
+	GetID() string
+	GetStreams() []*Stream
+	GetFiles() []*File
+	GetTitle() string
+	GetImage() *string
+}
+
 type Pagination interface {
 	IsPagination()
 	GetTotal() int
@@ -60,10 +67,20 @@ type Pagination interface {
 	GetOffset() int
 }
 
+type PlaylistItem interface {
+	IsCollectionItem()
+	IsPlaylistItem()
+	GetID() string
+	GetTitle() string
+	GetDescription() *string
+	GetImage() *string
+}
+
 type Prompt interface {
 	IsPrompt()
 	GetID() string
 	GetTitle() string
+	GetSecondaryTitle() *string
 	GetFrom() string
 	GetTo() string
 }
@@ -90,6 +107,10 @@ type Section interface {
 
 type SectionItemType interface {
 	IsSectionItemType()
+}
+
+type SubclipSourceItem interface {
+	IsSubclipSourceItem()
 }
 
 type SurveyQuestion interface {
@@ -209,6 +230,7 @@ type BirthOptions struct {
 }
 
 type Calendar struct {
+	Events []*Event        `json:"events"`
 	Period *CalendarPeriod `json:"period"`
 	Day    *CalendarDay    `json:"day"`
 }
@@ -264,28 +286,12 @@ func (this CardSection) GetMetadata() *ItemSectionMetadata { return this.Metadat
 func (this CardSection) GetItems() *SectionItemPagination { return this.Items }
 
 type Chapter struct {
-	ID    string `json:"id"`
-	Start int    `json:"start"`
-	Title string `json:"title"`
+	ID          string  `json:"id"`
+	Start       int     `json:"start"`
+	Title       string  `json:"title"`
+	Image       *string `json:"image,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
-
-type Collection struct {
-	ID    string                    `json:"id"`
-	Slug  *string                   `json:"slug,omitempty"`
-	Items *CollectionItemPagination `json:"items,omitempty"`
-}
-
-type CollectionItemPagination struct {
-	Total  int              `json:"total"`
-	First  int              `json:"first"`
-	Offset int              `json:"offset"`
-	Items  []CollectionItem `json:"items"`
-}
-
-func (CollectionItemPagination) IsPagination()       {}
-func (this CollectionItemPagination) GetTotal() int  { return this.Total }
-func (this CollectionItemPagination) GetFirst() int  { return this.First }
-func (this CollectionItemPagination) GetOffset() int { return this.Offset }
 
 type Config struct {
 	Global *GlobalConfig `json:"global"`
@@ -352,6 +358,11 @@ type Device struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+type EmailOptions struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
 type Episode struct {
 	ID                    string                 `json:"id"`
 	UUID                  string                 `json:"uuid"`
@@ -388,10 +399,45 @@ type Episode struct {
 	ShareRestriction      ShareRestriction       `json:"shareRestriction"`
 	InMyList              bool                   `json:"inMyList"`
 	// Should probably be used asynchronously, and retrieved separately from the episode, as it can be slow in some cases (a few db requests can occur)
-	Next []*Episode `json:"next"`
+	Next   []*Episode `json:"next"`
+	Cursor string     `json:"cursor"`
+}
+
+func (Episode) IsCollectionItem()            {}
+func (this Episode) GetID() string           { return this.ID }
+func (this Episode) GetTitle() string        { return this.Title }
+func (this Episode) GetDescription() *string { return &this.Description }
+
+func (Episode) IsPlaylistItem() {}
+
+func (this Episode) GetImage() *string { return this.Image }
+
+func (Episode) IsMediaItem() {}
+
+func (this Episode) GetStreams() []*Stream {
+	if this.Streams == nil {
+		return nil
+	}
+	interfaceSlice := make([]*Stream, 0, len(this.Streams))
+	for _, concrete := range this.Streams {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
+func (this Episode) GetFiles() []*File {
+	if this.Files == nil {
+		return nil
+	}
+	interfaceSlice := make([]*File, 0, len(this.Files))
+	for _, concrete := range this.Files {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
 }
 
 func (Episode) IsSectionItemType() {}
+
+func (Episode) IsSubclipSourceItem() {}
 
 func (Episode) IsUserCollectionEntryItem() {}
 
@@ -416,31 +462,9 @@ func (this EpisodeCalendarEntry) GetEnd() string         { return this.End }
 
 type EpisodeContext struct {
 	CollectionID *string `json:"collectionId,omitempty"`
-}
-
-type EpisodeItem struct {
-	ID       string   `json:"id"`
-	Sort     int      `json:"sort"`
-	Title    string   `json:"title"`
-	ImageURL *string  `json:"imageUrl,omitempty"`
-	Images   []*Image `json:"images"`
-	Episode  *Episode `json:"episode"`
-}
-
-func (EpisodeItem) IsCollectionItem()         {}
-func (this EpisodeItem) GetID() string        { return this.ID }
-func (this EpisodeItem) GetSort() int         { return this.Sort }
-func (this EpisodeItem) GetTitle() string     { return this.Title }
-func (this EpisodeItem) GetImageURL() *string { return this.ImageURL }
-func (this EpisodeItem) GetImages() []*Image {
-	if this.Images == nil {
-		return nil
-	}
-	interfaceSlice := make([]*Image, 0, len(this.Images))
-	for _, concrete := range this.Images {
-		interfaceSlice = append(interfaceSlice, concrete)
-	}
-	return interfaceSlice
+	PlaylistID   *string `json:"playlistId,omitempty"`
+	Shuffle      *bool   `json:"shuffle,omitempty"`
+	Cursor       *string `json:"cursor,omitempty"`
 }
 
 type EpisodePagination struct {
@@ -488,11 +512,12 @@ func (this EpisodeSearchItem) GetImage() *string       { return this.Image }
 func (this EpisodeSearchItem) GetURL() string          { return this.URL }
 
 type Event struct {
-	ID    string `json:"id"`
-	Title string `json:"title"`
-	Start string `json:"start"`
-	End   string `json:"end"`
-	Image string `json:"image"`
+	ID      string          `json:"id"`
+	Title   string          `json:"title"`
+	Start   string          `json:"start"`
+	End     string          `json:"end"`
+	Image   string          `json:"image"`
+	Entries []CalendarEntry `json:"entries"`
 }
 
 type Export struct {
@@ -547,6 +572,7 @@ func (this FeaturedSection) GetItems() *SectionItemPagination { return this.Item
 type File struct {
 	ID               string  `json:"id"`
 	URL              string  `json:"url"`
+	VideoLanguage    *string `json:"videoLanguage,omitempty"`
 	AudioLanguage    string  `json:"audioLanguage"`
 	SubtitleLanguage *string `json:"subtitleLanguage,omitempty"`
 	Size             int     `json:"size"`
@@ -562,6 +588,11 @@ type Game struct {
 	URL         string  `json:"url"`
 	Image       *string `json:"image,omitempty"`
 }
+
+func (Game) IsCollectionItem()            {}
+func (this Game) GetID() string           { return this.ID }
+func (this Game) GetTitle() string        { return this.Title }
+func (this Game) GetDescription() *string { return this.Description }
 
 func (Game) IsSectionItemType() {}
 
@@ -801,30 +832,32 @@ func (this PageDetailsSection) GetID() string           { return this.ID }
 func (this PageDetailsSection) GetTitle() *string       { return this.Title }
 func (this PageDetailsSection) GetDescription() *string { return this.Description }
 
-type PageItem struct {
-	ID       string   `json:"id"`
-	Sort     int      `json:"sort"`
-	Title    string   `json:"title"`
-	ImageURL *string  `json:"imageUrl,omitempty"`
-	Images   []*Image `json:"images"`
-	Page     *Page    `json:"page"`
+type Playlist struct {
+	ID          string                  `json:"id"`
+	Title       string                  `json:"title"`
+	Description *string                 `json:"description,omitempty"`
+	Image       *string                 `json:"image,omitempty"`
+	Items       *PlaylistItemPagination `json:"items"`
 }
 
-func (PageItem) IsCollectionItem()         {}
-func (this PageItem) GetID() string        { return this.ID }
-func (this PageItem) GetSort() int         { return this.Sort }
-func (this PageItem) GetTitle() string     { return this.Title }
-func (this PageItem) GetImageURL() *string { return this.ImageURL }
-func (this PageItem) GetImages() []*Image {
-	if this.Images == nil {
-		return nil
-	}
-	interfaceSlice := make([]*Image, 0, len(this.Images))
-	for _, concrete := range this.Images {
-		interfaceSlice = append(interfaceSlice, concrete)
-	}
-	return interfaceSlice
+func (Playlist) IsCollectionItem()            {}
+func (this Playlist) GetID() string           { return this.ID }
+func (this Playlist) GetTitle() string        { return this.Title }
+func (this Playlist) GetDescription() *string { return this.Description }
+
+func (Playlist) IsSectionItemType() {}
+
+type PlaylistItemPagination struct {
+	Total  int            `json:"total"`
+	First  int            `json:"first"`
+	Offset int            `json:"offset"`
+	Items  []PlaylistItem `json:"items"`
 }
+
+func (PlaylistItemPagination) IsPagination()       {}
+func (this PlaylistItemPagination) GetTotal() int  { return this.Total }
+func (this PlaylistItemPagination) GetFirst() int  { return this.First }
+func (this PlaylistItemPagination) GetOffset() int { return this.Offset }
 
 type PosterGridSection struct {
 	ID          string                 `json:"id"`
@@ -953,6 +986,11 @@ type Season struct {
 
 func (Season) IsEpisodeContextUnion() {}
 
+func (Season) IsCollectionItem()            {}
+func (this Season) GetID() string           { return this.ID }
+func (this Season) GetTitle() string        { return this.Title }
+func (this Season) GetDescription() *string { return &this.Description }
+
 func (Season) IsSectionItemType() {}
 
 type SeasonCalendarEntry struct {
@@ -972,31 +1010,6 @@ func (this SeasonCalendarEntry) GetTitle() string       { return this.Title }
 func (this SeasonCalendarEntry) GetDescription() string { return this.Description }
 func (this SeasonCalendarEntry) GetStart() string       { return this.Start }
 func (this SeasonCalendarEntry) GetEnd() string         { return this.End }
-
-type SeasonItem struct {
-	ID       string   `json:"id"`
-	Sort     int      `json:"sort"`
-	Title    string   `json:"title"`
-	ImageURL *string  `json:"imageUrl,omitempty"`
-	Images   []*Image `json:"images"`
-	Season   *Season  `json:"season"`
-}
-
-func (SeasonItem) IsCollectionItem()         {}
-func (this SeasonItem) GetID() string        { return this.ID }
-func (this SeasonItem) GetSort() int         { return this.Sort }
-func (this SeasonItem) GetTitle() string     { return this.Title }
-func (this SeasonItem) GetImageURL() *string { return this.ImageURL }
-func (this SeasonItem) GetImages() []*Image {
-	if this.Images == nil {
-		return nil
-	}
-	interfaceSlice := make([]*Image, 0, len(this.Images))
-	for _, concrete := range this.Images {
-		interfaceSlice = append(interfaceSlice, concrete)
-	}
-	return interfaceSlice
-}
 
 type SeasonPagination struct {
 	Total  int       `json:"total"`
@@ -1070,9 +1083,57 @@ func (this SectionPagination) GetTotal() int  { return this.Total }
 func (this SectionPagination) GetFirst() int  { return this.First }
 func (this SectionPagination) GetOffset() int { return this.Offset }
 
-type Settings struct {
-	AudioLanguages    []string `json:"audioLanguages"`
-	SubtitleLanguages []string `json:"subtitleLanguages"`
+type Short struct {
+	ID          string         `json:"id"`
+	Title       string         `json:"title"`
+	Description *string        `json:"description,omitempty"`
+	Image       *string        `json:"image,omitempty"`
+	Streams     []*Stream      `json:"streams"`
+	Files       []*File        `json:"files"`
+	Source      *SubclipSource `json:"source,omitempty"`
+	InMyList    bool           `json:"inMyList"`
+}
+
+func (Short) IsSectionItemType() {}
+
+func (Short) IsCollectionItem()            {}
+func (this Short) GetID() string           { return this.ID }
+func (this Short) GetTitle() string        { return this.Title }
+func (this Short) GetDescription() *string { return this.Description }
+
+func (Short) IsPlaylistItem() {}
+
+func (this Short) GetImage() *string { return this.Image }
+
+func (Short) IsMediaItem() {}
+
+func (this Short) GetStreams() []*Stream {
+	if this.Streams == nil {
+		return nil
+	}
+	interfaceSlice := make([]*Stream, 0, len(this.Streams))
+	for _, concrete := range this.Streams {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
+func (this Short) GetFiles() []*File {
+	if this.Files == nil {
+		return nil
+	}
+	interfaceSlice := make([]*File, 0, len(this.Files))
+	for _, concrete := range this.Files {
+		interfaceSlice = append(interfaceSlice, concrete)
+	}
+	return interfaceSlice
+}
+
+func (Short) IsUserCollectionEntryItem() {}
+
+type ShortsPagination struct {
+	Cursor     string   `json:"cursor"`
+	NextCursor string   `json:"nextCursor"`
+	Shorts     []*Short `json:"shorts"`
 }
 
 type Show struct {
@@ -1095,6 +1156,11 @@ type Show struct {
 
 func (Show) IsSectionItemType() {}
 
+func (Show) IsCollectionItem()            {}
+func (this Show) GetID() string           { return this.ID }
+func (this Show) GetTitle() string        { return this.Title }
+func (this Show) GetDescription() *string { return &this.Description }
+
 func (Show) IsUserCollectionEntryItem() {}
 
 type ShowCalendarEntry struct {
@@ -1115,31 +1181,6 @@ func (this ShowCalendarEntry) GetDescription() string { return this.Description 
 func (this ShowCalendarEntry) GetStart() string       { return this.Start }
 func (this ShowCalendarEntry) GetEnd() string         { return this.End }
 
-type ShowItem struct {
-	ID       string   `json:"id"`
-	Sort     int      `json:"sort"`
-	Title    string   `json:"title"`
-	ImageURL *string  `json:"imageUrl,omitempty"`
-	Images   []*Image `json:"images"`
-	Show     *Show    `json:"show"`
-}
-
-func (ShowItem) IsCollectionItem()         {}
-func (this ShowItem) GetID() string        { return this.ID }
-func (this ShowItem) GetSort() int         { return this.Sort }
-func (this ShowItem) GetTitle() string     { return this.Title }
-func (this ShowItem) GetImageURL() *string { return this.ImageURL }
-func (this ShowItem) GetImages() []*Image {
-	if this.Images == nil {
-		return nil
-	}
-	interfaceSlice := make([]*Image, 0, len(this.Images))
-	for _, concrete := range this.Images {
-		interfaceSlice = append(interfaceSlice, concrete)
-	}
-	return interfaceSlice
-}
-
 type ShowSearchItem struct {
 	ID          string  `json:"id"`
 	LegacyID    *string `json:"legacyID,omitempty"`
@@ -1150,6 +1191,7 @@ type ShowSearchItem struct {
 	Highlight   *string `json:"highlight,omitempty"`
 	Image       *string `json:"image,omitempty"`
 	URL         string  `json:"url"`
+	Show        *Show   `json:"show"`
 }
 
 func (ShowSearchItem) IsSearchResultItem()          {}
@@ -1183,9 +1225,11 @@ func (this SimpleCalendarEntry) GetEnd() string         { return this.End }
 type Stream struct {
 	ID                string     `json:"id"`
 	URL               string     `json:"url"`
+	VideoLanguage     *string    `json:"videoLanguage,omitempty"`
 	AudioLanguages    []string   `json:"audioLanguages"`
 	SubtitleLanguages []string   `json:"subtitleLanguages"`
 	Type              StreamType `json:"type"`
+	Downloadable      bool       `json:"downloadable"`
 }
 
 type StudyTopic struct {
@@ -1203,6 +1247,17 @@ type StudyTopic struct {
 
 func (StudyTopic) IsSectionItemType() {}
 
+func (StudyTopic) IsCollectionItem()            {}
+func (this StudyTopic) GetID() string           { return this.ID }
+func (this StudyTopic) GetTitle() string        { return this.Title }
+func (this StudyTopic) GetDescription() *string { return &this.Description }
+
+type SubclipSource struct {
+	Item  SubclipSourceItem `json:"item"`
+	Start *float64          `json:"start,omitempty"`
+	End   *float64          `json:"end,omitempty"`
+}
+
 type Survey struct {
 	ID          string                    `json:"id"`
 	Title       string                    `json:"title"`
@@ -1211,18 +1266,20 @@ type Survey struct {
 }
 
 type SurveyPrompt struct {
-	ID     string  `json:"id"`
-	Title  string  `json:"title"`
-	From   string  `json:"from"`
-	To     string  `json:"to"`
-	Survey *Survey `json:"survey"`
+	ID             string  `json:"id"`
+	Title          string  `json:"title"`
+	SecondaryTitle *string `json:"secondaryTitle,omitempty"`
+	From           string  `json:"from"`
+	To             string  `json:"to"`
+	Survey         *Survey `json:"survey"`
 }
 
-func (SurveyPrompt) IsPrompt()             {}
-func (this SurveyPrompt) GetID() string    { return this.ID }
-func (this SurveyPrompt) GetTitle() string { return this.Title }
-func (this SurveyPrompt) GetFrom() string  { return this.From }
-func (this SurveyPrompt) GetTo() string    { return this.To }
+func (SurveyPrompt) IsPrompt()                       {}
+func (this SurveyPrompt) GetID() string              { return this.ID }
+func (this SurveyPrompt) GetTitle() string           { return this.Title }
+func (this SurveyPrompt) GetSecondaryTitle() *string { return this.SecondaryTitle }
+func (this SurveyPrompt) GetFrom() string            { return this.From }
+func (this SurveyPrompt) GetTo() string              { return this.To }
 
 type SurveyQuestionPagination struct {
 	First  int              `json:"first"`
@@ -1293,7 +1350,6 @@ type User struct {
 	Audience              *string    `json:"audience,omitempty"`
 	Email                 *string    `json:"email,omitempty"`
 	EmailVerified         bool       `json:"emailVerified"`
-	Settings              *Settings  `json:"settings"`
 	Roles                 []string   `json:"roles"`
 	Analytics             *Analytics `json:"analytics"`
 	Gender                Gender     `json:"gender"`
@@ -1310,7 +1366,7 @@ type UserCollection struct {
 
 type UserCollectionEntry struct {
 	ID   string                  `json:"id"`
-	Item UserCollectionEntryItem `json:"item"`
+	Item UserCollectionEntryItem `json:"item,omitempty"`
 }
 
 type UserCollectionEntryPagination struct {

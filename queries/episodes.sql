@@ -9,6 +9,10 @@ WITH ts AS (SELECT episodes_id,
                      array_agg(tags_id) AS tags
               FROM episodes_tags
               GROUP BY episodes_id),
+     asset_ids AS (SELECT episodes_id,
+                          json_object_agg(language, assets_id) AS ids
+                   FROM episodes_assets
+                   GROUP BY episodes_id),
      images AS (WITH images AS (SELECT episode_id, style, language, filename_disk
                                 FROM images img
                                          JOIN directus_files df on img.file = df.id)
@@ -21,32 +25,38 @@ SELECT e.id,
        e.legacy_id,
        e.legacy_program_id,
        e.asset_id,
+       asset_ids.ids                                                           AS assets,
        e.episode_number,
        e.publish_date,
        e.production_date,
        e.public_title,
-       s.episode_number_in_title                         AS number_in_title,
-       COALESCE(e.prevent_public_indexing, false)::bool  as prevent_public_indexing,
-       ea.available_from::timestamp without time zone    AS available_from,
-       ea.available_to::timestamp without time zone      AS available_to,
-       COALESCE(e.publish_date_in_title, sh.publish_date_in_title, sh.type = 'event',
-                false)::bool                             AS publish_date_in_title,
-       fs.filename_disk                                  as image_file_name,
+       s.episode_number_in_title                                               AS number_in_title,
+       COALESCE(e.prevent_public_indexing, false)::bool                        as prevent_public_indexing,
+       ea.available_from::timestamp without time zone                          AS available_from,
+       ea.available_to::timestamp without time zone                            AS available_to,
+       COALESCE(e.publish_date_in_title, false)::bool                          AS publish_date_in_title,
+       fs.filename_disk                                                        as image_file_name,
        e.season_id,
        e.type,
-       COALESCE(img.json, '[]')                          as images,
+       COALESCE(img.json, '[]')                                                as images,
        ts.title,
        ts.description,
        ts.extra_description,
-       tags.tags::int[]                                  AS tag_ids,
-       assets.duration                                   as duration,
-       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating,
+       tags.tags::int[]                                                        AS tag_ids,
+       assets.duration                                                         as duration,
+       COALESCE(e.agerating_code, s.agerating_code, 'A')                       as agerating,
        audience,
-       content_type
+       content_type,
+       timedmetadata_from_asset,
+       (SELECT array_agg(id ORDER BY seconds)
+        FROM timedmetadata md
+        WHERE (timedmetadata_from_asset AND md.asset_id = e.asset_id)
+           OR (NOT timedmetadata_from_asset AND md.episode_id = e.id))::uuid[] AS timedmetadata_ids
 FROM episodes e
          LEFT JOIN ts ON e.id = ts.episodes_id
          LEFT JOIN tags ON tags.episodes_id = e.id
          LEFT JOIN images img ON img.episode_id = e.id
+         LEFT JOIN asset_ids ON asset_ids.episodes_id = e.id
          LEFT JOIN assets ON e.asset_id = assets.id
          LEFT JOIN seasons s ON e.season_id = s.id
          LEFT JOIN shows sh ON s.show_id = sh.id
@@ -65,6 +75,10 @@ WITH ts AS (SELECT episodes_id,
                      array_agg(tags_id) AS tags
               FROM episodes_tags
               GROUP BY episodes_id),
+     asset_ids AS (SELECT episodes_id,
+                          json_object_agg(language, assets_id) AS ids
+                   FROM episodes_assets
+                   GROUP BY episodes_id),
      images AS (WITH images AS (SELECT episode_id, style, language, filename_disk
                                 FROM images img
                                          JOIN directus_files df on img.file = df.id
@@ -78,32 +92,38 @@ SELECT e.id,
        e.legacy_id,
        e.legacy_program_id,
        e.asset_id,
+       asset_ids.ids                                                           AS assets,
        e.episode_number,
        e.publish_date,
        e.production_date,
        e.public_title,
-       s.episode_number_in_title                         AS number_in_title,
-       COALESCE(e.prevent_public_indexing, false)::bool  as prevent_public_indexing,
-       ea.available_from::timestamp without time zone    AS available_from,
-       ea.available_to::timestamp without time zone      AS available_to,
-       COALESCE(e.publish_date_in_title, sh.publish_date_in_title, sh.type = 'event',
-                false)::bool                             AS publish_date_in_title,
-       fs.filename_disk                                  as image_file_name,
+       s.episode_number_in_title                                               AS number_in_title,
+       COALESCE(e.prevent_public_indexing, false)::bool                        as prevent_public_indexing,
+       ea.available_from::timestamp without time zone                          AS available_from,
+       ea.available_to::timestamp without time zone                            AS available_to,
+       COALESCE(e.publish_date_in_title, false)::bool                          AS publish_date_in_title,
+       fs.filename_disk                                                        as image_file_name,
        e.season_id,
        e.type,
-       COALESCE(img.json, '[]')                          as images,
+       COALESCE(img.json, '[]')                                                as images,
        ts.title,
        ts.description,
        ts.extra_description,
-       tags.tags::int[]                                  AS tag_ids,
-       assets.duration                                   as duration,
-       COALESCE(e.agerating_code, s.agerating_code, 'A') as agerating,
+       tags.tags::int[]                                                        AS tag_ids,
+       assets.duration                                                         as duration,
+       COALESCE(e.agerating_code, s.agerating_code, 'A')                       as agerating,
        audience,
-       content_type
+       content_type,
+       timedmetadata_from_asset,
+       (SELECT array_agg(id ORDER BY seconds)
+        FROM timedmetadata md
+        WHERE (timedmetadata_from_asset AND md.asset_id = e.asset_id)
+           OR (NOT timedmetadata_from_asset AND md.episode_id = e.id))::uuid[] AS timedmetadata_ids
 FROM episodes e
          LEFT JOIN ts ON e.id = ts.episodes_id
          LEFT JOIN tags ON tags.episodes_id = e.id
          LEFT JOIN images img ON img.episode_id = e.id
+         LEFT JOIN asset_ids ON asset_ids.episodes_id = e.id
          LEFT JOIN assets ON e.asset_id = assets.id
          LEFT JOIN seasons s ON e.season_id = s.id
          LEFT JOIN shows sh ON s.show_id = sh.id
@@ -129,8 +149,8 @@ WHERE season_id = ANY ($1::int[])
   AND access.published
   AND access.available_to > now()
   AND (
-        (roles.roles && $2::varchar[] AND access.available_from < now()) OR
-        (roles.roles_earlyaccess && $2::varchar[])
+    (roles.roles && $2::varchar[] AND access.available_from < now()) OR
+    (roles.roles_earlyaccess && $2::varchar[])
     )
 ORDER BY e.episode_number;
 
@@ -143,8 +163,8 @@ WHERE e.id = ANY ($1::int[])
   AND access.published
   AND access.available_to > now()
   AND (
-        (roles.roles && $2::varchar[] AND access.available_from < now()) OR
-        (roles.roles_earlyaccess && $2::varchar[])
+    (roles.roles && $2::varchar[] AND access.available_from < now()) OR
+    (roles.roles_earlyaccess && $2::varchar[])
     );
 
 -- name: getEpisodeUUIDsWithRoles :many
@@ -156,8 +176,8 @@ WHERE e.uuid = ANY ($1::uuid[])
   AND access.published
   AND access.available_to > now()
   AND (
-        (roles.roles && $2::varchar[] AND access.available_from < now()) OR
-        (roles.roles_earlyaccess && $2::varchar[])
+    (roles.roles && $2::varchar[] AND access.available_from < now()) OR
+    (roles.roles_earlyaccess && $2::varchar[])
     );
 
 -- name: getEpisodeIDsForLegacyProgramIDs :many
@@ -199,6 +219,6 @@ WHERE t.tags_id = ANY (@tag_ids::int[])
   AND access.published
   AND access.available_to > now()
   AND (
-        (roles.roles && @roles::varchar[] AND access.available_from < now()) OR
-        (roles.roles_earlyaccess && @roles::varchar[])
+    (roles.roles && @roles::varchar[] AND access.available_from < now()) OR
+    (roles.roles_earlyaccess && @roles::varchar[])
     );
