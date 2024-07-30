@@ -59,6 +59,13 @@ fragment SectionItem on SectionItem {
         ... on StudyTopic {
             id
         }
+        ... on Playlist {
+            id
+        }
+        ... on Link {
+            id
+            url
+        }
     }
 }
 

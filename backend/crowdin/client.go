@@ -3,25 +3,17 @@ package crowdin
 import (
 	"context"
 	"fmt"
-	"github.com/bcc-code/brunstadtv/backend/sqlc"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/bcc-code/bcc-media-platform/backend/sqlc"
+
 	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/ansel1/merry/v2"
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/directus"
 	"github.com/bcc-code/mediabank-bridge/log"
 	"github.com/go-resty/resty/v2"
 	"github.com/samber/lo"
-)
-
-// Fields
-const (
-	TitleField       = "title"
-	DescriptionField = "description"
-	PlaceholderField = "placeholder"
 )
 
 // Config for the client
@@ -33,7 +25,6 @@ type Config struct {
 // Client for crowdin interactions
 type Client struct {
 	c        *resty.Client
-	du       *directus.Handler
 	config   Config
 	q        *sqlc.Queries
 	readonly bool
@@ -50,12 +41,11 @@ func ensureSuccess(res *resty.Response) error {
 }
 
 // New client for requests
-func New(config Config, directusHandler *directus.Handler, queries *sqlc.Queries, readonly bool) *Client {
+func New(config Config, queries *sqlc.Queries, readonly bool) *Client {
 	c := resty.New().
 		SetBaseURL("https://api.crowdin.com/api/v2/").
 		SetAuthToken(config.Token)
 	return &Client{
-		du:       directusHandler,
 		c:        c,
 		config:   config,
 		q:        queries,
@@ -85,13 +75,13 @@ func getItem[t any](client *Client, endpoint string, id int) (item t, err error)
 func getItems[t any](client *Client, endpoint string, limit int, offset int, queryParams map[string]string) (items []t, err error) {
 	req := client.c.R()
 	req.SetResult(Result[[]Object[t]]{})
-	if queryParams != nil {
-		req.SetQueryParams(queryParams)
+	if queryParams == nil {
+		queryParams = map[string]string{}
 	}
-	req.SetQueryParams(map[string]string{
-		"limit":  strconv.Itoa(limit),
-		"offset": strconv.Itoa(offset),
-	})
+	queryParams["limit"] = strconv.Itoa(limit)
+	queryParams["offset"] = strconv.Itoa(offset)
+
+	req.SetQueryParams(queryParams)
 	query := fmt.Sprintf("/%s", endpoint)
 	res, err := req.Get(query)
 	if err != nil {
@@ -129,7 +119,8 @@ func createItem[t any](client *Client, endpoint string, item t) (i t, err error)
 	return
 }
 
-type simpleTranslation struct {
+// SimpleTranslation contains info about the translation object as stored in the database
+type SimpleTranslation struct {
 	ID       string
 	ParentID string
 	Values   map[string]string
@@ -137,14 +128,15 @@ type simpleTranslation struct {
 	Changed  bool
 }
 
-func convertTsToStrings(ts []simpleTranslation, prefix string, contextFactory func(parentID string) string) []String {
-	return lo.Reduce(ts, func(stringObjects []String, t simpleTranslation, _ int) []String {
+func convertTsToStrings(ts []SimpleTranslation, prefix string, contextFactory func(parentID string) string) []String {
+	return lo.Reduce(ts, func(stringObjects []String, t SimpleTranslation, _ int) []String {
 		var values = t.Values
 		for key, value := range values {
 			if value != "" {
 				str := String{
 					Identifier: fmt.Sprintf("%s-%s-%s", prefix, t.ParentID, key),
 					Text:       value,
+					IsHidden:   false,
 				}
 
 				if contextFactory != nil {
@@ -172,8 +164,9 @@ func (c *Client) getDirectoryForProject(project Project) (d Directory, err error
 
 	var directory *Directory
 	for _, dir := range directories {
+		v := dir
 		if dir.Name == "content" {
-			directory = &dir
+			directory = &v
 		}
 	}
 	if directory == nil {
@@ -201,6 +194,7 @@ func (c *Client) getFileForCollection(project Project, directoryId int, collecti
 			if f.Title == collection {
 				found = true
 				file = f
+				break
 			}
 		}
 	}
@@ -234,11 +228,6 @@ func dbLanguage(language string) string {
 	return language
 }
 
-type hasStatus interface {
-	UID() string
-	GetStatus() common.Status
-}
-
 var projectCache = cache.New[int, Project]()
 
 func (c *Client) getProject(projectId int) (i Project, err error) {
@@ -253,8 +242,8 @@ func (c *Client) getProject(projectId int) (i Project, err error) {
 	return
 }
 
-// Sync synchronizes translations from Directus to Crowdin
-func (c *Client) Sync(ctx context.Context, d *directus.Handler) error {
+// Sync synchronizes translations from Crowdin to Handler and Handler to Crowdin
+func (c *Client) Sync(ctx context.Context) error {
 	log.L.Debug().Msg("Translation sync: Started")
 	projectIds := c.config.ProjectIDs
 	for _, id := range projectIds {
@@ -272,63 +261,93 @@ func (c *Client) Sync(ctx context.Context, d *directus.Handler) error {
 			return err
 		}
 
-		err = c.syncEpisodes(ctx, d, project, directory.ID, crowdinTranslations)
+		options := Options{
+			Translations: crowdinTranslations,
+			Project:      project,
+			DirectoryID:  directory.ID,
+		}
+
+		err = c.syncEpisodes(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncSeasons(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncSeasons(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncShows(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncShows(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncSections(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncSections(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncPages(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncPages(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncLinks(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncLinks(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncTopics(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncTopics(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncLessons(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncLessons(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncTasks(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncTasks(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncAlternatives(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncAlternatives(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncAchievements(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncAchievements(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncSurveys(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncAchievementGroups(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncSurveyQuestions(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncSurveys(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncFAQs(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncSurveyQuestions(ctx, options)
 		if err != nil {
 			return err
 		}
-		err = c.syncFAQCategories(ctx, d, project, directory.ID, crowdinTranslations)
+		err = c.syncFAQs(ctx, options)
+		if err != nil {
+			return err
+		}
+		err = c.syncFAQCategories(ctx, options)
+		if err != nil {
+			return err
+		}
+		err = c.syncGames(ctx, options)
+		if err != nil {
+			return err
+		}
+		err = c.syncPlaylists(ctx, options)
+		if err != nil {
+			return err
+		}
+		err = c.syncEvents(ctx, options)
+		if err != nil {
+			return err
+		}
+		err = c.syncCalendarEntries(ctx, options)
+		if err != nil {
+			return err
+		}
+		err = c.syncMediaItems(ctx, options)
 		if err != nil {
 			return err
 		}

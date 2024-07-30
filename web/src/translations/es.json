@@ -5,6 +5,7 @@
         "logout": "Cerrar sesión",
         "stayLoggedOut": "Permanecer desconectado",
         "cancel": "Cancelar",
+        "accept": "Aceptar",
         "submit": "Enviar",
         "back": "Atrás",
         "next": "Siguiente",
@@ -15,7 +16,13 @@
         "send": "Enviar",
         "start": "Comenzar",
         "skip": "Saltar",
-        "join": "Unirse"
+        "join": "Unirse",
+        "open": "Abierta"
+    },
+    "download": {
+        "resolution": "Resolución",
+        "language": "Idiomas",
+        "progress": "Progreso"
     },
     "error": {
         "couldntSendYourMessage": "Tu mensaje no pudo ser enviado",
@@ -72,7 +79,9 @@
         }
     },
     "live": {
-        "now": "Ahora"
+        "now": "Ahora",
+        "title": "Nueva aplicación de transmisión en vivo",
+        "description": "¡Lo lamentamos! Ya no puedes ver transmisiones en vivo en este sitio web. ¡Haga clic en el enlace para ir a la nueva solución!"
     },
     "calendar": {
         "noScheduledEvents": "Sin eventos programados",
@@ -92,6 +101,7 @@
         "title": "Título",
         "subject": "Tema",
         "content": "Contenido",
+        "faq": "Preguntas frecuentes",
         "describeIssue": "Describe el problema en detalle."
     },
     "study": {
@@ -137,15 +147,24 @@
     "footer": {
         "cookies": "Cookies",
         "privacyPolicy": "Políticas de privacidad",
-        "information": "BCC Media es una fundación de medios en la [Federación BCC](https://bcc.no) que produce y distribuye contenidos con valores positivos y cristianos.",
+        "information": "",
         "headOffice": "Oficina central",
         "contactUs": "Contactenos",
-        "downloadApp": "Descarga nuestra aplicación"
+        "downloadApp": "Descarga nuestra aplicación",
+        "termsOfUse": "Condiciones de uso"
+    },
+    "terms": {
+        "byDownloadingYouAcceptTerms": "Al descargar este video, acepta nuestros [términos de uso](https://bcc.media/terms-of-use/) y nuestra [política de privacidad](https://bcc.media/privacy)."
     },
     "share": {
         "title": "Compartir",
         "copied": "Copiada al portapapeles",
         "membersOnly": "Este video solo es accesible para los usuarios que han iniciado sesión."
+    },
+    "quotes": {
+        "quoteOfTheDay": "",
+        "markAsRead": "",
+        "markAsUnread": ""
     },
     "feedback": {
         "appreciated": "Agradecemos sus comentarios.",
@@ -153,11 +172,44 @@
         "episodeTitle": "¿Cómo calificarías este episodio?",
         "howEasyToUnderstand": "¿Qué tan fácil fue entender el video?",
         "anonymousInfo": "Su calificación se enviará de forma anónima",
-        "placeholder": "Sea lo más detallado posible para ayudarnos a comprender."
+        "placeholder": "Sea lo más detallado posible para ayudarnos a comprender.",
+        "giveFeedback": ""
     },
     "contactLocalBukIfWrong": "Póngase en contacto con la persona responsable en su asociación BUK local si cree que esto está mal.",
     "thankYou": "¡Gracias!",
     "yourResponseHasBeenSubmitted": "Su respuesta ha sido enviada.",
     "sending": "Enviando",
-    "defaultInputPlaceholder": "Empieza a escribir aquí..."
+    "defaultInputPlaceholder": "Empieza a escribir aquí...",
+    "requests": {
+        "name": "Tu nombre",
+        "email": "Correo electrónico",
+        "role": "Tu rol",
+        "what": "Material a solicitar",
+        "how": "¿Cómo se utilizará el material?",
+        "howDescription": "Mostrado parcial/completamente, editado...",
+        "where": "¿Dónde se utilizará el material?",
+        "when": "¿Cuándo se utilizará el material?",
+        "clear": "Limpiar",
+        "send": "Enviar",
+        "editor": "Editor",
+        "director": "Director",
+        "producer": "Productor",
+        "eventCamp": "Evento/campamento",
+        "local": "Reunión local",
+        "mediaResponsible": "Responsable de los medios de comunicación",
+        "other": "Otro",
+        "confirmSend": "¿Enviar solicitud de material?",
+        "title": "Solicitud de material",
+        "description": "Formulario para solicitar material de audio, imagen y vídeo a BCC Media",
+        "receitTitle": "Solicitud recibida",
+        "confirmAgenda": "Confirmo que el material sólo se utilizará para el fin acordado.",
+        "receitDescription": "Nuestro equipo se pondrá en contacto con usted en un plazo de 7 días laborables. Se ha enviado una respuesta automática a su correo electrónico."
+    },
+    "shorts": {
+        "watchOnOurApp": "Descarga la aplicación móvil para ver cortos."
+    },
+    "subscriptions": {
+        "subscribe": "",
+        "unsubscribe": ""
+    }
 }

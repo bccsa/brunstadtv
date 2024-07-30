@@ -2,25 +2,30 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/ansel1/merry/v2"
-	"github.com/bcc-code/brunstadtv/backend/auth0"
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/members"
-	"github.com/bcc-code/brunstadtv/backend/remotecache"
-	"github.com/bcc-code/brunstadtv/backend/sqlc"
-	"github.com/bcc-code/brunstadtv/backend/user"
-	"github.com/bcc-code/brunstadtv/backend/utils"
+	"github.com/bcc-code/bcc-media-platform/backend/auth0"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/members"
+	"github.com/bcc-code/bcc-media-platform/backend/remotecache"
+	"github.com/bcc-code/bcc-media-platform/backend/sqlc"
+	"github.com/bcc-code/bcc-media-platform/backend/user"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 	"github.com/bcc-code/mediabank-bridge/log"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"go.opentelemetry.io/otel"
-	"strconv"
-	"sync"
-	"time"
 )
+
+const explicitRolesHeader = "x-explicit-roles"
 
 var userCacheLocks = utils.SyncMap[string, *sync.Mutex]{}
 
@@ -45,6 +50,36 @@ func ageFromBirthDate(birthDate string) int {
 	return years
 }
 
+func getExplicitRolesFromContext(ctx *gin.Context, queries *sqlc.Queries) []string {
+	var result []string
+	if explicitRoles := ctx.GetHeader(explicitRolesHeader); explicitRoles != "" {
+		allRoles, err := getRoles(ctx, queries)
+		if err != nil {
+			log.L.Error().Err(err).Send()
+		} else {
+			specifiedRoles := strings.Split(explicitRoles, ",")
+
+			for _, r := range specifiedRoles {
+				if _, ok := allRoles["explicit:"+r]; ok {
+					result = append(result, r)
+				}
+			}
+		}
+	}
+	return result
+}
+
+func getFeatureFlagRolesFromContext(ctx *gin.Context) []string {
+	var roles []string
+	featureFlags := utils.GetFeatureFlags(ctx)
+
+	for _, flag := range featureFlags.List() {
+		roles = append(roles, "feature-flag:"+flag)
+	}
+
+	return roles
+}
+
 // NewUserMiddleware returns a gin middleware that ingests a populated User struct
 // into the gin context
 func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, ls *common.BatchLoaders, auth0Client *auth0.Client) func(*gin.Context) {
@@ -53,6 +88,16 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 		defer span.End()
 
 		var roles []string
+
+		explicitRoles := getExplicitRolesFromContext(ctx, queries)
+		if len(explicitRoles) > 0 {
+			roles = append(roles, explicitRoles...)
+		}
+
+		featureRoles := getFeatureFlagRolesFromContext(ctx)
+		if len(featureRoles) > 0 {
+			roles = append(roles, featureRoles...)
+		}
 
 		authed := ctx.GetBool(auth0.CtxAuthenticated)
 
@@ -132,8 +177,14 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 
 			if u.IsActiveBCC() {
 				member, err := ls.MemberLoader.Get(ctx, int(intID))
-				if err != nil {
-					log.L.Info().Err(err).Msg("Failed to retrieve user from members.")
+				if err != nil || member == nil {
+					marshalledU, _ := json.Marshal(u)
+					log.L.Warn().
+						Err(err).
+						Int64("personId", intID).
+						Str("user", string(marshalledU)).
+						Msg("Failed to retrieve user from members.")
+
 					span.AddEvent("User failed to load from members")
 
 					dbUser, err := ls.UserLoader.Get(ctx, pid)
@@ -170,7 +221,7 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 					return i.OrgUid
 				}))
 				if err != nil {
-					return nil, err
+					log.L.Error().Err(err).Send()
 				}
 				for _, org := range organizations {
 					if org != nil && org.Type == "Church" {
@@ -211,8 +262,6 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 				}
 			}
 
-			u.Roles = roles
-
 			ageGroupMin := 0
 			for minAge, group := range user.AgeGroups {
 				// Note: Maps are not iterated in a sorted order, so we have to find the lowest applicable range
@@ -221,6 +270,11 @@ func NewUserMiddleware(queries *sqlc.Queries, remoteCache *remotecache.Client, l
 					ageGroupMin = minAge
 				}
 			}
+			if u.AgeGroup != "" && u.IsActiveBCC() {
+				roles = append(roles, "age-group:"+strings.Replace(u.AgeGroup, " ", "", -1))
+			}
+
+			u.Roles = roles
 
 			err := saveUser()
 
@@ -268,7 +322,12 @@ func getRoles(ctx context.Context, queries *sqlc.Queries) (map[string][]string, 
 		return nil, merry.Wrap(err)
 	}
 
-	lo.ForEach(roles, func(x sqlc.GetRolesRow, _ int) { allRoles[x.Code] = x.Emails })
+	lo.ForEach(roles, func(x sqlc.GetRolesRow, _ int) {
+		if x.ExplicitlyAvailable {
+			allRoles["explicit:"+x.Code] = x.Emails
+		}
+		allRoles[x.Code] = x.Emails
+	})
 
 	span.AddEvent("loaded into cache")
 	rolesCache.Set(user.CacheRoles, allRoles, cache.WithExpiration(60*time.Minute))

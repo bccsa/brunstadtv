@@ -38,6 +38,9 @@ var langMap = map[string]string{
 	"zht":       "zh",
 	"hrv":       "hr",
 	"hbs-hrv":   "hr",
+	"tam":       "ta",
+	"kha":       "kha",
+	"yue":       "yue",
 }
 
 // LegacyLanguageCodeTo639_1 converts language codes used in the legacy system and
@@ -50,4 +53,12 @@ func LegacyLanguageCodeTo639_1(code string) string {
 
 	log.L.Warn().Str("code", code).Msg("Unknown language code, please fix")
 	return ""
+}
+
+// An ordered list of fallback languages to use.
+// Our content should always be available in at least one of these languages.
+//
+// Returns a pointer to simplify usage when passing to other functions.
+func FallbackLanguages() *[]string {
+	return &[]string{"no", "en"}
 }

@@ -2,7 +2,8 @@ package sqlc
 
 import (
 	"context"
-	"github.com/bcc-code/brunstadtv/backend/common"
+
+	"github.com/bcc-code/bcc-media-platform/backend/common"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 )
@@ -24,7 +25,7 @@ func (q *Queries) GetDevices(ctx context.Context, profileIDs []uuid.UUID) ([]com
 	if err != nil {
 		return nil, err
 	}
-	return lo.Map(devices, func(i UsersDevice, _ int) common.Device {
+	return lo.Map(devices, func(i getDevicesForProfilesRow, _ int) common.Device {
 		return common.Device(i)
 	}), nil
 }
@@ -35,7 +36,7 @@ func (q *Queries) ListDevices(ctx context.Context) ([]common.Device, error) {
 	if err != nil {
 		return nil, err
 	}
-	return lo.Map(devices, func(i UsersDevice, _ int) common.Device {
+	return lo.Map(devices, func(i listDevicesRow, _ int) common.Device {
 		return common.Device(i)
 	}), nil
 }

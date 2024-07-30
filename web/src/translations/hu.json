@@ -5,6 +5,7 @@
         "logout": "Kijelentkezés",
         "stayLoggedOut": "Kijelentkezve maradni",
         "cancel": "Mégse",
+        "accept": "Jóváhagyás",
         "submit": "Megerősítés",
         "back": "Vissza",
         "next": "Következő",
@@ -15,7 +16,13 @@
         "send": "Küldés",
         "start": "Kezdés",
         "skip": "Átugrás",
-        "join": "Csatlakozás"
+        "join": "Csatlakozás",
+        "open": "Megnyitás"
+    },
+    "download": {
+        "resolution": "Felbontás",
+        "language": "Nyelv",
+        "progress": "Haladás"
     },
     "error": {
         "couldntSendYourMessage": "Nem sikerült elküldeni az üzenetedet",
@@ -72,7 +79,9 @@
         }
     },
     "live": {
-        "now": "Most"
+        "now": "Most",
+        "title": "Új élő közvetítés alkalmazás",
+        "description": "Sajnáljuk! Ezen a weboldalon már nem nézhet élő közvetítést. Kattintson a linkre az új megoldás eléréséhez!"
     },
     "calendar": {
         "noScheduledEvents": "Nincs tervezett esemény",
@@ -92,6 +101,7 @@
         "title": "Cím",
         "subject": "Tárgy",
         "content": "Tartalom",
+        "faq": "GYIK",
         "describeIssue": "Írd le részletesen a problémát."
     },
     "study": {
@@ -137,15 +147,24 @@
     "footer": {
         "cookies": "Sütik",
         "privacyPolicy": "Adatvédelmi szabályzat",
-        "information": "A BCC Media a [BCC Szövetség] (https://bcc.no) médiaalapítványa, amely pozitív és keresztény értékeket tartalmazó tartalmakat gyárt és terjeszt.\n\nA BCC Media bejegyzett műsorszolgáltató, és betartja a norvég műsorszolgáltatási törvényben meghatározott szabályokat. A törvényt felügyelő szerv a [Norvég Médiahatóság](https://medietilsynet.no/).",
+        "information": "",
         "headOffice": "Székhely",
         "contactUs": "Kapcsolat",
-        "downloadApp": "Alkalmazásunk letöltése"
+        "downloadApp": "Alkalmazásunk letöltése",
+        "termsOfUse": "Használati feltételek"
+    },
+    "terms": {
+        "byDownloadingYouAcceptTerms": "A videó letöltésével elfogadod a [felhasználási feltételeinket](https://bcc.media/terms-of-use) és [adatvédelmi irányelveinket](https://bcc.media/privacy)."
     },
     "share": {
         "title": "Megosztás",
         "copied": "Vágólapra másolva",
         "membersOnly": "Ez a videó csak bejelentkezett felhasználók számára érhető el."
+    },
+    "quotes": {
+        "quoteOfTheDay": "",
+        "markAsRead": "",
+        "markAsUnread": ""
     },
     "feedback": {
         "appreciated": "Nagyra értékeljük visszajelzésedet.",
@@ -153,11 +172,44 @@
         "episodeTitle": "Hogyan értékelnéd ezt az epizódot?",
         "howEasyToUnderstand": "Mennyire volt könnyű megérteni a videót?",
         "anonymousInfo": "Az értékelésed névtelenül kerül beküldésre",
-        "placeholder": "Legyél a lehető legrészletesebb, hogy segíts nekünk megérteni."
+        "placeholder": "Legyél a lehető legrészletesebb, hogy segíts nekünk megérteni.",
+        "giveFeedback": ""
     },
     "contactLocalBukIfWrong": "Ha úgy gondolod, hogy ez nem helyes, vedd fel a kapcsolatot a helyi BUK-felelőssel.",
     "thankYou": "Köszönjük!",
     "yourResponseHasBeenSubmitted": "A válaszodat elküldtük.",
     "sending": "Adás",
-    "defaultInputPlaceholder": "Itt kezdj el gépelni..."
+    "defaultInputPlaceholder": "Itt kezdj el gépelni...",
+    "requests": {
+        "name": "Neved",
+        "email": "E-mail",
+        "role": "A szereped",
+        "what": "A kért anyagok",
+        "how": "Hogyan fogják felhasználni az anyagot?",
+        "howDescription": "Részlegesen/teljesen látható, szerkesztett...",
+        "where": "Hol fogják felhasználni az anyagot?",
+        "when": "Mikor fogják felhasználni az anyagot?",
+        "clear": "Ürítés",
+        "send": "Küldés",
+        "editor": "Szerkesztő",
+        "director": "Rendező",
+        "producer": "Gyártó",
+        "eventCamp": "Rendezvény/tábor",
+        "local": "Helyi összejövetel",
+        "mediaResponsible": "Média felelős",
+        "other": "Egyéb",
+        "confirmSend": "Anyagigénylés küldése?",
+        "title": "Anyagigénylés",
+        "description": "Formanyomtatvány hang-, kép- és videóanyagok igényléséhez a BCC Media-tól",
+        "receitTitle": "A kérelem beérkezett",
+        "confirmAgenda": "Megerősítem, hogy az anyagot csak a megállapodás szerinti célra használom fel.",
+        "receitDescription": "Csapatunk 7 munkanapon belül felveszi veled a kapcsolatot. Automatikus választ küldtünk az e-mail címedre."
+    },
+    "shorts": {
+        "watchOnOurApp": "A shortok megtekintéséhez töltse le a mobilalkalmazást."
+    },
+    "subscriptions": {
+        "subscribe": "",
+        "unsubscribe": ""
+    }
 }

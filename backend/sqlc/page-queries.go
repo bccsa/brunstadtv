@@ -3,10 +3,10 @@ package sqlc
 import (
 	"context"
 	"encoding/json"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
 	"time"
 
-	"github.com/bcc-code/brunstadtv/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
 	"github.com/samber/lo"
 )
 
@@ -62,7 +62,6 @@ func (q *Queries) GetPermissionsForPages(ctx context.Context, ids []int) ([]comm
 	return lo.Map(items, func(row getPermissionsForPagesRow, _ int) common.Permissions[int] {
 		return common.Permissions[int]{
 			ItemID: int(row.ID),
-			Type:   common.TypePage,
 			Availability: common.Availability{
 				Published: row.Published,
 				From:      from,

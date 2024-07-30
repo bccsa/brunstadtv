@@ -2,8 +2,9 @@ package common
 
 import (
 	"context"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
-	"github.com/bcc-code/brunstadtv/backend/members"
+
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/members"
 	"github.com/google/uuid"
 )
 
@@ -31,17 +32,25 @@ type BatchLoaders struct {
 	EpisodeIDFromLegacyIDLoader        *loaders.Loader[int, *int]
 	EpisodeIDFromLegacyProgramIDLoader *loaders.Loader[int, *int]
 	LinkLoader                         *loaders.Loader[int, *Link]
-	FilesLoader                        *loaders.Loader[int, []*File]
-	StreamsLoader                      *loaders.Loader[int, []*Stream]
-	EventLoader                        *loaders.Loader[int, *Event]
-	FAQCategoryLoader                  *loaders.Loader[uuid.UUID, *FAQCategory]
-	QuestionLoader                     *loaders.Loader[uuid.UUID, *Question]
-	QuestionsLoader                    *loaders.Loader[uuid.UUID, []*uuid.UUID]
-	MessageGroupLoader                 *loaders.Loader[int, *MessageGroup]
-	RedirectFromCodeLoader             *loaders.Loader[string, *Redirect]
-	SurveyLoader                       *loaders.Loader[uuid.UUID, *Survey]
-	SurveyQuestionLoader               *loaders.Loader[uuid.UUID, *SurveyQuestion]
-	GameLoader                         *loaders.Loader[uuid.UUID, *Game]
+	PlaylistLoader                     *loaders.Loader[uuid.UUID, *Playlist]
+
+	FilesLoader   *loaders.Loader[int, []*File]
+	StreamsLoader *loaders.Loader[int, []*Stream]
+
+	AssetFilesLoader   *loaders.Loader[int, []*File]
+	AssetStreamsLoader *loaders.Loader[int, []*Stream]
+
+	EventLoader        *loaders.Loader[int, *Event]
+	EventEntriesLoader *loaders.Loader[int, []*int]
+
+	FAQCategoryLoader    *loaders.Loader[uuid.UUID, *FAQCategory]
+	QuestionLoader       *loaders.Loader[uuid.UUID, *Question]
+	MessageGroupLoader   *loaders.Loader[int, *MessageGroup]
+	SurveyLoader         *loaders.Loader[uuid.UUID, *Survey]
+	SurveyQuestionLoader *loaders.Loader[uuid.UUID, *SurveyQuestion]
+	GameLoader           *loaders.Loader[uuid.UUID, *Game]
+	ShortLoader          *loaders.Loader[uuid.UUID, *Short]
+	ShortsMediaIDLoader  *loaders.Loader[uuid.UUID, *uuid.UUID]
 
 	MemberLoader       *loaders.Loader[int, *members.Member]
 	OrganizationLoader *loaders.Loader[uuid.UUID, *members.Organization]
@@ -82,6 +91,11 @@ type BatchLoaders struct {
 	ProfileMyListCollectionID      *loaders.Loader[uuid.UUID, *uuid.UUID]
 
 	PromptLoader *loaders.Loader[uuid.UUID, *Prompt]
+
+	TimedMetadataLoader *loaders.Loader[uuid.UUID, *TimedMetadata]
+	PersonLoader        *loaders.Loader[uuid.UUID, *Person]
+	SongLoader          *loaders.Loader[uuid.UUID, *Song]
+	PhraseLoader        *loaders.Loader[string, *Phrase]
 }
 
 // FilteredLoaders contains loaders that will be filtered by permissions.
@@ -107,6 +121,8 @@ type FilteredLoaders struct {
 	StudyTaskFilterLoader   *loaders.Loader[uuid.UUID, *uuid.UUID]
 	SurveyQuestionsLoader   *loaders.Loader[uuid.UUID, []*uuid.UUID]
 
+	FAQQuestionsLoader *loaders.Loader[uuid.UUID, []*uuid.UUID]
+
 	//Relations
 	StudyLessonEpisodesLoader *loaders.Loader[uuid.UUID, []*int]
 	EpisodeStudyLessonsLoader *loaders.Loader[int, []*uuid.UUID]
@@ -114,7 +130,9 @@ type FilteredLoaders struct {
 	LinkStudyLessonsLoader    *loaders.Loader[int, []*uuid.UUID]
 
 	// Lists
-	PromptIDsLoader func(ctx context.Context) ([]uuid.UUID, error)
+	PromptIDsLoader      func(ctx context.Context) ([]uuid.UUID, error)
+	FAQCategoryIDsLoader func(ctx context.Context) ([]uuid.UUID, error)
+	ShortIDsLoader       func(ctx context.Context) ([][]uuid.UUID, error)
 }
 
 // ProfileLoaders contains loaders per profile
@@ -126,6 +144,8 @@ type ProfileLoaders struct {
 
 	SeasonDefaultEpisodeLoader *loaders.Loader[int, *int]
 	ShowDefaultEpisodeLoader   *loaders.Loader[int, *int]
+
+	MediaProgressLoader *loaders.Loader[uuid.UUID, *MediaProgress]
 
 	TopicDefaultLessonLoader *loaders.Loader[uuid.UUID, *uuid.UUID]
 }

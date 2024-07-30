@@ -5,6 +5,7 @@
         "logout": "Wyloguj",
         "stayLoggedOut": "Pozostań wylogowany",
         "cancel": "Anuluj",
+        "accept": "Akceptuję",
         "submit": "Wyślij",
         "back": "Wstecz",
         "next": "Następne",
@@ -15,7 +16,13 @@
         "send": "Wyślij",
         "start": "Start",
         "skip": "Pomiń",
-        "join": "Dołącz"
+        "join": "Dołącz",
+        "open": "Otwórz"
+    },
+    "download": {
+        "resolution": "Rozdzielczość",
+        "language": "Język",
+        "progress": "Postęp"
     },
     "error": {
         "couldntSendYourMessage": "Nie udało się wysłać wiadomości",
@@ -72,7 +79,9 @@
         }
     },
     "live": {
-        "now": "Teraz"
+        "now": "Teraz",
+        "title": "Nowa aplikacja do transmisji na żywo",
+        "description": "Przepraszamy! Nie możesz już oglądać transmisji na żywo na tej stronie. Kliknij link, aby przejść do nowego rozwiązania!"
     },
     "calendar": {
         "noScheduledEvents": "Brak zaplanowanych wydarzeń",
@@ -92,6 +101,7 @@
         "title": "Tytuł",
         "subject": "Temat",
         "content": "Treść",
+        "faq": "FAQ",
         "describeIssue": "Opisz problem ze szczegółami."
     },
     "study": {
@@ -137,15 +147,24 @@
     "footer": {
         "cookies": "Ciasteczka",
         "privacyPolicy": "Polityka prywatności",
-        "information": "BCC Media to fundacja medialna w federacji BCC, która zajmuje się produkcją i dystrybucją treści o charakterze pozytywnym i chrześcijańskim.\n\nBCC Media jest zarejestrowanym kanałem telewizyjnym i stosuje się do regulacji zawartych w Norweskim Akcie Telewizyjnym. Organem nadzorującym ten Akt jest [the Norwegian Media Authority] (https://medietilsynet.no/).",
+        "information": "",
         "headOffice": "Siedziba",
         "contactUs": "Kontakt",
-        "downloadApp": "Pobierz naszą aplikację"
+        "downloadApp": "Pobierz naszą aplikację",
+        "termsOfUse": "Warunki użytkowania"
+    },
+    "terms": {
+        "byDownloadingYouAcceptTerms": "Pobierając ten film, akceptujesz nasze [warunki użytkowania](https://bcc.media/terms-of-use) i [politykę prywatności](https://bcc.media/privacy)."
     },
     "share": {
         "title": "Udostępnij",
         "copied": "Skopiowano do schowka",
         "membersOnly": "To wideo jest dostępne wyłącznie dla zalogowanych użytkowników."
+    },
+    "quotes": {
+        "quoteOfTheDay": "",
+        "markAsRead": "",
+        "markAsUnread": ""
     },
     "feedback": {
         "appreciated": "Doceniamy twój feedback.",
@@ -153,11 +172,44 @@
         "episodeTitle": "Jak oceniłbyś ten odcinek?",
         "howEasyToUnderstand": "Jak łatwo było zrozumieć ten film?",
         "anonymousInfo": "Twoja ocena zostanie zapisana anonimowo",
-        "placeholder": "Prosimy o szczegółowy opis, który będzie łatwiejszy do zrozumienia."
+        "placeholder": "Prosimy o szczegółowy opis, który będzie łatwiejszy do zrozumienia.",
+        "giveFeedback": ""
     },
     "contactLocalBukIfWrong": "Skontaktuj się z osobą odpowiedzialną za twoją grupę BUK, jeśli uważasz, że powinno być inaczej.",
     "thankYou": "Dziękujemy!",
     "yourResponseHasBeenSubmitted": "Zapisano twoją odpowiedź.",
     "sending": "Wysyłam",
-    "defaultInputPlaceholder": "Pisz tutaj..."
+    "defaultInputPlaceholder": "Pisz tutaj...",
+    "requests": {
+        "name": "Twoje imię",
+        "email": "E-mail",
+        "role": "Twoja rola",
+        "what": "Materiały, o które prosisz",
+        "how": "W jaki sposób będą używane materiały?",
+        "howDescription": "Pokazane częściowo/w całości, edytowane...",
+        "where": "Gdzie będą używane materiały?",
+        "when": "Kiedy będą używane materiały?",
+        "clear": "Wyczyść",
+        "send": "Wyślij",
+        "editor": "Redaktor",
+        "director": "Reżyser",
+        "producer": "Producent",
+        "eventCamp": "Wydarzenia/obozy",
+        "local": "Lokalne zgromadzenia",
+        "mediaResponsible": "Odpowiedzialny za media",
+        "other": "Inne",
+        "confirmSend": "Wysłać prośbę o materiał?",
+        "title": "Prośba o materiał",
+        "description": "Formularz zamówienia materiałów audio, zdjęć i wideo od BCC Media",
+        "receitTitle": "Prośba otrzymana",
+        "confirmAgenda": "Potwierdzam, że materiały będą wykorzystywane wyłącznie w uzgodnionym celu.",
+        "receitDescription": "Nasz zespół skontaktuje się z Tobą w ciągu 7 dni roboczych. Na Twój adres e-mail została wysłana automatyczna odpowiedź."
+    },
+    "shorts": {
+        "watchOnOurApp": "Pobierz aplikację mobilną, aby oglądać shortsy."
+    },
+    "subscriptions": {
+        "subscribe": "",
+        "unsubscribe": ""
+    }
 }

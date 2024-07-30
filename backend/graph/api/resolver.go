@@ -4,41 +4,43 @@ import (
 	"context"
 	"crypto/rsa"
 	"fmt"
-	"github.com/bcc-code/brunstadtv/backend/auth0"
-	"github.com/bcc-code/brunstadtv/backend/remotecache"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/bcc-code/brunstadtv/backend/ratelimit"
+	"github.com/bcc-code/bcc-media-platform/backend/auth0"
+	"github.com/bcc-code/bcc-media-platform/backend/remotecache"
+
+	"github.com/bcc-code/bcc-media-platform/backend/ratelimit"
 	"github.com/bcc-code/mediabank-bridge/log"
 	"github.com/cloudevents/sdk-go/v2/event/datacodec/json"
 	"github.com/google/uuid"
-	"github.com/tabbed/pqtype"
+	"github.com/sqlc-dev/pqtype"
 
-	"github.com/99designs/gqlgen/graphql"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bcc-code/brunstadtv/backend/email"
-	"github.com/bcc-code/brunstadtv/backend/export"
-	"github.com/bcc-code/brunstadtv/backend/graph/api/model"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
-	"github.com/bcc-code/brunstadtv/backend/memorycache"
+	"github.com/bcc-code/bcc-media-platform/backend/email"
+	"github.com/bcc-code/bcc-media-platform/backend/export"
+	"github.com/bcc-code/bcc-media-platform/backend/graph/api/model"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/memorycache"
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel"
 
 	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/ansel1/merry/v2"
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/signing"
-	"github.com/bcc-code/brunstadtv/backend/sqlc"
-	"github.com/bcc-code/brunstadtv/backend/user"
-	"github.com/bcc-code/brunstadtv/backend/utils"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/signing"
+	"github.com/bcc-code/bcc-media-platform/backend/sqlc"
+	"github.com/bcc-code/bcc-media-platform/backend/user"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 	"github.com/samber/lo"
 )
 
 // This file will not be regenerated automatically.
 //
 // It serves as dependency injection for your app, add any dependencies you require here.
+
+const timestampContextKey = "GqlTimestamp"
 
 const episodeContextKey = "EpisodeContext"
 
@@ -217,30 +219,6 @@ func resolverForIntID[t any, r any](ctx context.Context, loaders *itemLoaders[in
 	return resolverFor(ctx, loaders, int(intID), converter)
 }
 
-func itemsResolverFor[k comparable, kr comparable, t any, r any](ctx context.Context, ls *itemLoaders[k, t], listLoader *loaders.Loader[kr, []*k], id kr, converter func(context.Context, *t) r) ([]r, error) {
-	ctx, span := otel.Tracer("resolver").Start(ctx, "items")
-	defer span.End()
-	itemIds, err := listLoader.Get(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	ids := lo.Map(lo.Filter(itemIds, func(i *k, _ int) bool {
-		if ls.Permissions != nil {
-			return user.ValidateAccess(ctx, ls.Permissions, *i, user.CheckConditions{
-				FromDate: true,
-			}) == nil
-		}
-		return true
-	}), func(i *k, _ int) k {
-		return *i
-	})
-
-	items, err := ls.Item.GetMany(ctx, ids)
-
-	return utils.MapWithCtx(ctx, items, converter), err
-}
-
 func imageOrFallback(ctx context.Context, images common.Images, style *model.ImageStyle, fallbacks ...common.Images) *string {
 	ginCtx, _ := utils.GinCtx(ctx)
 	languages := user.GetLanguagesFromCtx(ginCtx)
@@ -296,15 +274,15 @@ func messageStyleFromString(styleString string) *model.MessageStyle {
 }
 
 func resolveMessageSection(ctx context.Context, r *messageSectionResolver, s *common.Section) ([]*model.Message, error) {
-	var timestamp *string
-	fieldCtx := graphql.GetRootFieldContext(ctx)
-	for _, a := range fieldCtx.Field.Arguments {
-		if a.Name == "timestamp" && a.Value.Raw != "null" {
-			timestamp = &a.Value.Raw
-		}
+
+	ginCtx, _ := utils.GinCtx(ctx)
+	timestamp := ginCtx.GetString(timestampContextKey)
+	var timestampPointer *string
+	if timestamp != "" {
+		timestampPointer = &timestamp
 	}
 
-	t, err := utils.TimestampFromString(timestamp)
+	t, err := utils.TimestampFromString(timestampPointer)
 	if err != nil {
 		return nil, err
 	}
@@ -338,10 +316,6 @@ func resolveMessageSection(ctx context.Context, r *messageSectionResolver, s *co
 		return nil, nil
 	}
 
-	ginCtx, err := utils.GinCtx(ctx)
-	if err != nil {
-		return nil, err
-	}
 	languages := user.GetLanguagesFromCtx(ginCtx)
 
 	return lo.Map(group.Messages, func(i common.Message, _ int) *model.Message {

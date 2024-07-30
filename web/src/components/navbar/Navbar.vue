@@ -90,10 +90,10 @@
                                                     {{ l.name }}
                                                 </p>
                                                 <p
-                                                    v-if="l.english"
+                                                    v-if="l.localizedName"
                                                     class="text-gray"
                                                 >
-                                                    {{ l.english }}
+                                                    {{ l.localizedName }}
                                                 </p>
                                             </div>
                                         </MenuItem>
@@ -112,8 +112,8 @@
                                     class="flex hover:scale-110 transition rounded-md text-base font-medium text-white hover:text-opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75"
                                 >
                                     <img
-                                        class="w-8 h-8 rounded rounded-full overflow-hidden stroke-primary"
-                                        v-if="user.picture"
+                                        class="w-8 h-8 rounded-full overflow-hidden stroke-primary"
+                                        v-if="user?.picture"
                                         :src="user.picture"
                                     />
                                     <ProfileIcon
@@ -161,6 +161,26 @@
                                                                     : "login")
                                                         )
                                                     }}
+                                                </p>
+                                            </button>
+                                        </MenuItem>
+                                        <MenuItem
+                                            v-slot="{ active }"
+                                            @click="showFAQ = true"
+                                        >
+                                            <button
+                                                :class="[
+                                                    active
+                                                        ? 'bg-violet-500 text-white'
+                                                        : 'text-gray-900',
+                                                    'flex w-full rounded-md px-2 py-2 text-sm items-center transition duration-50',
+                                                ]"
+                                            >
+                                                <QuestionIcon
+                                                    class="h-6"
+                                                ></QuestionIcon>
+                                                <p class="ml-2 text-base">
+                                                    {{ $t("support.faq") }}
                                                 </p>
                                             </button>
                                         </MenuItem>
@@ -262,10 +282,10 @@
                                                     {{ l.name }}
                                                 </p>
                                                 <p
-                                                    v-if="l.english"
+                                                    v-if="l.localizedName"
                                                     class="text-gray"
                                                 >
-                                                    {{ l.english }}
+                                                    {{ l.localizedName }}
                                                 </p>
                                             </div>
                                         </MenuItem>
@@ -280,8 +300,8 @@
                                     class="flex rounded-md text-base font-medium text-white hover:text-opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75"
                                 >
                                     <img
-                                        class="w-8 h-8 rounded rounded-full overflow-hidden stroke-primary"
-                                        v-if="authenticated && user.picture"
+                                        class="w-8 h-8 rounded-full overflow-hidden stroke-primary"
+                                        v-if="authenticated && user?.picture"
                                         :src="user.picture"
                                     />
                                     <ProfileIcon
@@ -351,6 +371,26 @@
                                         </MenuItem> -->
                                         <MenuItem
                                             v-slot="{ active }"
+                                            @click="showFAQ = true"
+                                        >
+                                            <button
+                                                :class="[
+                                                    active
+                                                        ? 'bg-violet-500 text-white'
+                                                        : 'text-gray-900',
+                                                    'flex w-full rounded-md px-2 py-2 text-sm items-center transition duration-50',
+                                                ]"
+                                            >
+                                                <QuestionIcon
+                                                    class="h-6"
+                                                ></QuestionIcon>
+                                                <p class="ml-2 text-base">
+                                                    {{ $t("support.faq") }}
+                                                </p>
+                                            </button>
+                                        </MenuItem>
+                                        <MenuItem
+                                            v-slot="{ active }"
                                             v-if="authenticated"
                                             @click="showContactForm = true"
                                         >
@@ -394,10 +434,11 @@
             </div>
         </div>
         <ContactForm v-model:show="showContactForm" />
+        <FAQ v-model:show="showFAQ" />
     </Disclosure>
 </template>
 <script lang="ts" setup>
-import { RouteLocationRaw } from "vue-router"
+import { RouteLocationRaw, useRoute } from "vue-router"
 import NavLink from "./NavLink.vue"
 import {
     Disclosure,
@@ -416,17 +457,27 @@ import {
     QuestionIcon,
     SearchIcon,
 } from "../icons"
-import { computed, ref } from "vue"
+import { computed, onMounted, ref } from "vue"
 import SearchInput from "../SearchInput.vue"
 import { useSearch } from "@/utils/search"
 import { useGetCalendarStatusQuery, useGetMeQuery } from "@/graph/generated"
 import ContactForm from "@/components/support/ContactForm.vue"
+import FAQ from "../support/FAQ.vue"
 
 const { data: meQuery, fetching, executeQuery } = useGetMeQuery()
 
 const { query } = useSearch()
 
 const { authenticated, signOut, signIn, user } = useAuth()
+
+const route = useRoute()
+
+onMounted(() => {
+    const q = route.query.q
+    if (q && typeof q === "string") {
+        query.value = q
+    }
+})
 
 const isLive = computed(() => {
     const now = new Date()
@@ -454,23 +505,13 @@ const getNavigation = (showLive?: boolean) => {
     ]
 
     if (showLive) {
-        n.push(
-            {
-                name: "page.live",
-                to: {
-                    name: "live",
-                },
-                icon: LiveIcon,
-                ping: isLive.value,
+        n.push({
+            name: "page.live",
+            to: {
+                name: "live",
             },
-            {
-                name: "page.calendar",
-                to: {
-                    name: "calendar",
-                },
-                icon: CalendarIcon,
-            }
-        )
+            icon: LiveIcon,
+        })
     }
 
     return n
@@ -483,4 +524,6 @@ const { data } = useGetCalendarStatusQuery({
         day: new Date(),
     },
 })
+
+const showFAQ = ref(false)
 </script>

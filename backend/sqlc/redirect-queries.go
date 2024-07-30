@@ -3,8 +3,8 @@ package sqlc
 import (
 	"context"
 
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 )
@@ -12,10 +12,11 @@ import (
 func mapToRedirects(redirects []getRedirectsRow) []common.Redirect {
 	return lo.Map(redirects, func(r getRedirectsRow, _ int) common.Redirect {
 		return common.Redirect{
-			Code:         r.Code,
-			ID:           r.ID,
-			TargetURL:    r.TargetUrl,
-			IncludeToken: r.IncludeToken,
+			Code:                   r.Code,
+			ID:                     r.ID,
+			TargetURL:              r.TargetUrl,
+			IncludeToken:           r.IncludeToken,
+			RequiresAuthentication: r.RequiresAuthentication,
 		}
 	})
 }

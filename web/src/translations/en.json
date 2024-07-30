@@ -5,6 +5,7 @@
         "logout": "Logout",
         "stayLoggedOut": "Stay logged out",
         "cancel": "Cancel",
+        "accept": "Accept",
         "submit": "Submit",
         "back": "Back",
         "next": "Next",
@@ -15,7 +16,13 @@
         "send": "Send",
         "start": "Start",
         "skip": "Skip",
-        "join": "Join"
+        "join": "Join",
+        "open": "Open"
+    },
+    "download": {
+        "resolution": "Resolution",
+        "language": "Language",
+        "progress": "Progress"
     },
     "error": {
         "couldntSendYourMessage": "Couldn't send your message",
@@ -72,7 +79,9 @@
         }
     },
     "live": {
-        "now": "Now"
+        "now": "Now",
+        "title": "New livestream app",
+        "description": "We're sorry! You are no longer able to watch livestreams on this website. Click the link to go to the new solution!"
     },
     "calendar": {
         "noScheduledEvents": "No scheduled events",
@@ -92,6 +101,7 @@
         "title": "Title",
         "subject": "Subject",
         "content": "Content",
+        "faq": "FAQ",
         "describeIssue": "Describe your issue in detail."
     },
     "study": {
@@ -137,15 +147,24 @@
     "footer": {
         "cookies": "Cookies",
         "privacyPolicy": "Privacy Policy",
-        "information": "BCC Media is a media foundation in the [BCC federation](https://bcc.no) that produces and distributes content with positive and Christian values.\n\nBCC Media is a registered broadcaster and adheres to the regulations laid down in the Norwegian Broadcasting Act. The supervisory body for this Act is [the Norwegian Media Authority](https://medietilsynet.no/).",
+        "information": "BCC Media is a media foundation in the [BCC federation](https://bcc.no) that produces and distributes content with positive and Christian values.",
         "headOffice": "Head office",
         "contactUs": "Contact us",
-        "downloadApp": "Download our app"
+        "downloadApp": "Download our app",
+        "termsOfUse": "Terms of Use"
+    },
+    "terms": {
+        "byDownloadingYouAcceptTerms": "By downloading this video, you accept our [terms of use](https://bcc.media/terms-of-use/) and [privacy policy](https://bcc.media/privacy)."
     },
     "share": {
         "title": "Share",
         "copied": "Copied to clipboard",
         "membersOnly": "This video is only accessible to users that are logged in."
+    },
+    "quotes": {
+        "quoteOfTheDay": "Quote of the day",
+        "markAsRead": "Mark as read",
+        "markAsUnread": "Mark as unread"
     },
     "feedback": {
         "appreciated": "We appreciate your feedback.",
@@ -153,11 +172,44 @@
         "episodeTitle": "How would you rate this episode?",
         "howEasyToUnderstand": "How easy was it to understand the video?",
         "anonymousInfo": "Your rating will be submitted anonymously",
-        "placeholder": "Please be as detailed as possible to help us understand."
+        "placeholder": "Please be as detailed as possible to help us understand.",
+        "giveFeedback": "Give feedback"
     },
     "contactLocalBukIfWrong": "Contact the person responsible in your local BUK association if you think this is wrong.",
     "thankYou": "Thank you!",
     "yourResponseHasBeenSubmitted": "Your response has been submitted.",
     "sending": "Sending",
-    "defaultInputPlaceholder": "Start typing here..."
+    "defaultInputPlaceholder": "Start typing here...",
+    "requests": {
+        "name": "Your name",
+        "email": "Email",
+        "role": "Your role",
+        "what": "Material to be requested",
+        "how": "How will the material be used?",
+        "howDescription": "Shown partially/fully, edited...",
+        "where": "Where will the material be used?",
+        "when": "When will the material be used?",
+        "clear": "Clear",
+        "send": "Send",
+        "editor": "Editor",
+        "director": "Director",
+        "producer": "Producer",
+        "eventCamp": "Event/camp",
+        "local": "Local gathering",
+        "mediaResponsible": "Media responsible",
+        "other": "Other",
+        "confirmSend": "Send material request?",
+        "title": "Request for material",
+        "description": "Form for requesting audio, picture and video materials from BCC Media",
+        "receitTitle": "Request received",
+        "confirmAgenda": "I confirm that the material will only be used for the agreed purpose.",
+        "receitDescription": "Our team will contact you within 7 working days. An automatic reply has been sent to your email."
+    },
+    "shorts": {
+        "watchOnOurApp": "Download the mobile app to watch shorts."
+    },
+    "subscriptions": {
+        "subscribe": "Subscribe",
+        "unsubscribe": "Unsubscribe"
+    }
 }

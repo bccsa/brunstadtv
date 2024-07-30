@@ -5,6 +5,7 @@
         "logout": "Çıkış Yap",
         "stayLoggedOut": "Oturumu dışı kal",
         "cancel": "İptal",
+        "accept": "Kabul et",
         "submit": "Gönder",
         "back": "Geri",
         "next": "Sonraki",
@@ -15,7 +16,13 @@
         "send": "Gönder",
         "start": "Başlat",
         "skip": "",
-        "join": ""
+        "join": "",
+        "open": ""
+    },
+    "download": {
+        "resolution": "",
+        "language": "",
+        "progress": ""
     },
     "error": {
         "couldntSendYourMessage": "Mesajınız gönderilemedi",
@@ -72,7 +79,9 @@
         }
     },
     "live": {
-        "now": "Şimdi"
+        "now": "Şimdi",
+        "title": "",
+        "description": ""
     },
     "calendar": {
         "noScheduledEvents": "Planlanmış etkinlik yok",
@@ -92,6 +101,7 @@
         "title": "Başlık",
         "subject": "Konu",
         "content": "İçerik",
+        "faq": "SSS",
         "describeIssue": "Sorununuzu ayrıntılı olarak açıklayın."
     },
     "study": {
@@ -137,15 +147,24 @@
     "footer": {
         "cookies": "Çerezler",
         "privacyPolicy": "Gizlilik Politikası",
-        "information": "BCC Media, [BCC federasyonunda](https://bcc.no) pozitif ve Hristiyan değerlere sahip içerik üreten ve dağıtan bir medya kuruluşudur.\n\nBCC Media tescilli bir yayıncıdır ve Norveç Yayıncılık Yasasında belirtilen düzenlemelere bağlıdır. Bu Yasanın denetim organı [Norveç Medya Kurumudur](https://medietilsynet.no/).",
+        "information": "",
         "headOffice": "Merkez ofis",
         "contactUs": "Bize Ulaşın",
-        "downloadApp": "Uygulamamızı indirin"
+        "downloadApp": "Uygulamamızı indirin",
+        "termsOfUse": ""
+    },
+    "terms": {
+        "byDownloadingYouAcceptTerms": ""
     },
     "share": {
         "title": "Paylaş",
         "copied": "Panoya kopyalandı",
         "membersOnly": "Bu videoya yalnızca oturum açmış kullanıcılar erişebilir."
+    },
+    "quotes": {
+        "quoteOfTheDay": "",
+        "markAsRead": "",
+        "markAsUnread": ""
     },
     "feedback": {
         "appreciated": "Geribildirim için teşekkürler.",
@@ -153,11 +172,44 @@
         "episodeTitle": "Bu bölümü nasıl değerlendirirsiniz?",
         "howEasyToUnderstand": "",
         "anonymousInfo": "Derecelendirmeniz anonim olarak gönderilecek",
-        "placeholder": "Lütfen anlamamıza yardımcı olmak için mümkün olduğunca ayrıntılı olun."
+        "placeholder": "Lütfen anlamamıza yardımcı olmak için mümkün olduğunca ayrıntılı olun.",
+        "giveFeedback": ""
     },
     "contactLocalBukIfWrong": "",
     "thankYou": "Teşekkür ederim!",
     "yourResponseHasBeenSubmitted": "Yanıtınız gönderildi.",
     "sending": "Gönderiliyor",
-    "defaultInputPlaceholder": "Buraya yazmaya başlayın..."
+    "defaultInputPlaceholder": "Buraya yazmaya başlayın...",
+    "requests": {
+        "name": "",
+        "email": "",
+        "role": "",
+        "what": "",
+        "how": "",
+        "howDescription": "",
+        "where": "",
+        "when": "",
+        "clear": "",
+        "send": "Gönder",
+        "editor": "",
+        "director": "",
+        "producer": "",
+        "eventCamp": "",
+        "local": "",
+        "mediaResponsible": "",
+        "other": "",
+        "confirmSend": "",
+        "title": "",
+        "description": "",
+        "receitTitle": "",
+        "confirmAgenda": "",
+        "receitDescription": ""
+    },
+    "shorts": {
+        "watchOnOurApp": ""
+    },
+    "subscriptions": {
+        "subscribe": "",
+        "unsubscribe": ""
+    }
 }

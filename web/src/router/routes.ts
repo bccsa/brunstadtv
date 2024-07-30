@@ -7,6 +7,12 @@ export default [
         component: () => import("@/layout/StackedLayout.vue"),
         children: [
             {
+                name: "webview",
+                path: "/w/:code",
+                component: () => import("@/pages/w.vue"),
+                props: true,
+            },
+            {
                 name: "page",
                 path: ":pageId",
                 component: () => import("@/pages/page/Page.vue"),
@@ -45,6 +51,12 @@ export default [
                 props: true,
             },
             {
+                name: "playlist-episode",
+                path: "playlist/:playlistId/:episodeId",
+                component: () => import("@/pages/episode/Episode.vue"),
+                props: true,
+            },
+            {
                 name: "calendar",
                 path: "/calendar",
                 component: () => import("@/pages/calendar/Calendar.vue"),
@@ -71,6 +83,13 @@ export default [
                 component: () => import("@/pages/EpisodeRedirect.vue"),
                 props: true,
             },
+            {
+                name: "shorts",
+                path: "/shorts/:shortId",
+                alias: "/short/:shortId",
+                props: true,
+                component: () => import("@/pages/shorts/Shorts.vue"),
+            },
         ],
     },
     {
@@ -84,7 +103,27 @@ export default [
                 component: () => import("@/components/study/Lesson.vue"),
                 props: true,
             },
+            {
+                name: "comic",
+                path: "comic/:comicId",
+                component: () => import("@/components/comics/Comic.vue"),
+                props: true,
+            },
+            {
+                name: "quote-of-the-day",
+                path: "quote-of-the-day",
+                component: () => import("@/components/quotes/QuoteOfTheDay.vue"),
+                props: true,
+            },
         ],
+    },
+    {
+        name: "delete-account",
+        path: "/delete-account",
+        component: () => import("@/pages/DeleteAccount.vue"),
+        props: {
+            title: "Delete my account",
+        },
     },
     {
         name: "not-found",
@@ -104,5 +143,35 @@ export default [
         name: "login",
         path: "/login",
         component: () => import("@/pages/Login.vue"),
+    },
+    {
+        name: "embed-episode",
+        path: "/embed/:episodeId",
+        props: true,
+        component: () => import("@/pages/EpisodeEmbed.vue"),
+    },
+    {
+        name: "embed-episode-legacy",
+        path: "/embed/legacy/episode/:legacyId",
+        props: true,
+        component: () => import("@/pages/EpisodeEmbed.vue"),
+    },
+    {
+        name: "embed-episode-legacy",
+        path: "/embed/legacy/program/:programId",
+        props: true,
+        component: () => import("@/pages/EpisodeEmbed.vue"),
+    },
+    {
+        name: "web",
+        path: "/web",
+        component: () => import("@/pages/Web.vue"),
+        children: [
+            {
+                name: "material-request",
+                path: "material-request",
+                component: () => import("@/pages/web/MaterialRequest.vue"),
+            },
+        ],
     },
 ] as RouteRecordRaw[]

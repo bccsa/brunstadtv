@@ -3,8 +3,9 @@ package search
 import (
 	"context"
 	"fmt"
-	"github.com/bcc-code/brunstadtv/backend/common"
 	"strconv"
+
+	"github.com/bcc-code/bcc-media-platform/backend/common"
 )
 
 func (service *Service) episodeToSearchItem(ctx context.Context, episode common.Episode) (searchItem, error) {
@@ -21,21 +22,23 @@ func (service *Service) episodeToSearchItem(ctx context.Context, episode common.
 		if err != nil {
 			return searchItem{}, err
 		}
-		shID := season.ShowID
-		showID = &shID
-		show, err := service.loaders.ShowLoader.Load(ctx, shID)()
-		if err != nil {
-			return searchItem{}, err
-		}
+		if season != nil {
+			shID := season.ShowID
+			showID = &shID
+			show, err := service.loaders.ShowLoader.Load(ctx, shID)()
+			if err != nil {
+				return searchItem{}, err
+			}
 
-		showID = &show.ID
-		showTitle = &show.Title
-		seasonID = &season.ID
-		seasonTitle = &season.Title
+			showID = &show.ID
+			showTitle = &show.Title
+			seasonID = &season.ID
+			seasonTitle = &season.Title
 
-		if episode.Number.Valid {
-			headerString := fmt.Sprintf("S%d:E%d", season.Number, episode.Number.Int64)
-			header = &headerString
+			if episode.Number.Valid {
+				headerString := fmt.Sprintf("S%d:E%d", season.Number, episode.Number.Int64)
+				header = &headerString
+			}
 		}
 	}
 
@@ -50,10 +53,7 @@ func (service *Service) episodeToSearchItem(ctx context.Context, episode common.
 		legacyID = &v
 	}
 
-	var image *string
-	if episode.Image.Valid {
-		image = &episode.Image.String
-	}
+	image := episode.Images.GetDefault([]string{"no"}, common.ImageStyleDefault)
 
 	var item = searchItem{
 		ID:          "episodes-" + strconv.Itoa(episode.ID),

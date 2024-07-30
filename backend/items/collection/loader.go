@@ -3,12 +3,12 @@ package collection
 import (
 	"context"
 	"database/sql"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
 	"github.com/samber/lo/parallel"
 	"sync"
 	"time"
 
-	"github.com/bcc-code/brunstadtv/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
 	"github.com/bcc-code/mediabank-bridge/log"
 	"github.com/graph-gophers/dataloader/v7"
 	"github.com/samber/lo"
@@ -99,9 +99,13 @@ func GetCollectionEntries(ctx context.Context, ls *common.BatchLoaders, filtered
 			return nil, err
 		}
 		return lo.Map(itemIds, func(id common.Identifier, index int) Entry {
+			c := common.Collections.Parse(id.Collection)
+			if c == nil {
+				c = &common.CollectionEpisodes
+			}
 			return Entry{
 				ID:         id.ID,
-				Collection: common.ItemCollection(id.Collection),
+				Collection: *c,
 				Sort:       index,
 			}
 		}), nil

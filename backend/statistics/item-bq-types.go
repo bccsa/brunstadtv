@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/bcc-code/brunstadtv/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/sqlc"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 	"github.com/google/uuid"
 )
 
@@ -161,5 +163,121 @@ func EpisodeFromCommon(e common.Episode, _ int) Episode {
 		Updated:               time.Now(),
 		Audience:              nullStr(e.Audience.Ptr()),
 		ContentType:           nullStr(e.ContentType.Ptr()),
+	}
+}
+
+type TimedMetadata struct {
+	ID          string              `json:"id"`
+	Type        string              `json:"type"`
+	Timestamp   float64             `json:"timestamp"`
+	Title       bigquery.NullString `json:"title"`
+	Description bigquery.NullString `json:"description"`
+	ChapterType bigquery.NullString `json:"chapterType"`
+	PersonIDs   string              `json:"personIds"`
+	SongID      uuid.NullUUID       `json:"songId"`
+}
+
+func TimedMetadataFromCommon(tm common.TimedMetadata, _ int) TimedMetadata {
+	return TimedMetadata{
+		ID:          tm.ID.String(),
+		Type:        tm.Type,
+		Title:       nullStr(tm.Title.GetValueOrNil(statsLanguages)),
+		Description: nullStr(tm.Description.GetValueOrNil(statsLanguages)),
+		Timestamp:   tm.Timestamp,
+		ChapterType: nullStr(&tm.ChapterType.Value),
+		PersonIDs:   asJsonString(tm.PersonIDs),
+		SongID:      tm.SongID,
+	}
+}
+
+type MediaItem struct {
+	ID            string               `json:"id"`
+	UserCreated   string               `json:"userCreated" bigquery:"user_created"`
+	DateCreated   time.Time            `json:"dateCreated" bigquery:"date_created"`
+	UserUpdated   string               `json:"userUpdated" bigquery:"user_updated"`
+	DateUpdated   time.Time            `json:"dateUpdated" bigquery:"date_updated"`
+	Label         string               `json:"label"`
+	Title         bigquery.NullString  `json:"title"`
+	Description   bigquery.NullString  `json:"description"`
+	Type          string               `json:"type"`
+	AssetID       string               `json:"assetId" bigquery:"asset_id"`
+	ParentEpisode bigquery.NullInt64   `json:"parentEpisode" bigquery:"parent_episode"`
+	ParentStarts  bigquery.NullFloat64 `json:"parentStarts" bigquery:"parent_starts"`
+	ParentEnds    bigquery.NullFloat64 `json:"parentEnds" bigquery:"parent_ends"`
+}
+
+func MediaItemFromDb(mi sqlc.Mediaitem, _ int) MediaItem {
+	return MediaItem{
+		ID:            mi.ID.String(),
+		UserCreated:   mi.UserCreated.UUID.String(),
+		DateCreated:   mi.DateCreated.Time,
+		UserUpdated:   mi.UserUpdated.UUID.String(),
+		DateUpdated:   mi.DateUpdated.Time,
+		Label:         mi.Label,
+		Title:         nullStr(mi.Title.Ptr()),
+		Description:   nullStr(mi.Description.Ptr()),
+		Type:          mi.Type,
+		AssetID:       fmt.Sprint(mi.AssetID.Int64),
+		ParentEpisode: bigquery.NullInt64(mi.ParentEpisodeID.NullInt64),
+		ParentStarts:  bigquery.NullFloat64(mi.ParentStartsAt),
+		ParentEnds:    bigquery.NullFloat64(mi.ParentEndsAt),
+	}
+}
+
+type Short struct {
+	ID          string               `bigquery:"id"`
+	MediaID     string               `bigquery:"media_id"`
+	AssetID     string               `bigquery:"asset_id"`
+	Label       string               `bigquery:"label"`
+	EpisodeID   string               `bigquery:"episode_id"`
+	Status      string               `bigquery:"status"`
+	StartsAt    bigquery.NullFloat64 `bigquery:"starts_at"`
+	EndsAt      bigquery.NullFloat64 `bigquery:"ends_at"`
+	Image       bigquery.NullString  `bigquery:"image"`
+	DateUpdated time.Time            `bigquery:"date_updated"`
+}
+
+func ShortFromCommon(s common.Short, _ int) Short {
+	return Short{
+		ID:          s.ID.String(),
+		MediaID:     s.MediaID.String(),
+		AssetID:     fmt.Sprint(s.AssetID.Int64),
+		Label:       s.Label,
+		EpisodeID:   fmt.Sprint(s.EpisodeID.Int64),
+		StartsAt:    bigquery.NullFloat64(s.StartsAt.NullFloat64),
+		EndsAt:      bigquery.NullFloat64(s.EndsAt.NullFloat64),
+		Image:       nullStr(s.Images.GetDefault([]string{"no"}, common.ImageStyleDefault)),
+		DateUpdated: s.DateUpdated,
+		Status:      string(s.Status),
+	}
+}
+
+type CalendarEntry struct {
+	ID       string              `bigquery:"id"`
+	EventID  bigquery.NullString `bigquery:"event_id"`
+	Title    string              `bigquery:"title"`
+	Start    time.Time           `bigquery:"start"`
+	End      time.Time           `bigquery:"end"`
+	Type     bigquery.NullString `bigquery:"type"`
+	IsReplay bool                `bigquery:"is_replay"`
+	ItemID   bigquery.NullString `bigquery:"item_id"`
+}
+
+func CalendarEntryFromCommon(c common.CalendarEntry, _ int) CalendarEntry {
+	var eventID *string
+	if c.EventID.Valid {
+		e := fmt.Sprint(c.EventID.Int64)
+		eventID = &e
+	}
+
+	return CalendarEntry{
+		ID:       fmt.Sprint(c.ID),
+		EventID:  nullStr(eventID),
+		Title:    c.Title.Get(*utils.FallbackLanguages()),
+		Start:    c.Start,
+		End:      c.End,
+		Type:     nullStr(c.Type.Ptr()),
+		IsReplay: c.IsReplay,
+		ItemID:   nullIntToBQNullString(c.ItemID),
 	}
 }

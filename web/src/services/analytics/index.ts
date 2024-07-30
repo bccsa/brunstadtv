@@ -91,7 +91,9 @@ class Analytics {
         title: string
         meta?: {
             setting?: "webSettings"
-            episodeId?: string
+            episodeId?: string,
+            comicId?: string,
+            quoteId?: string,
         }
     }) {
         if (!this.initialized) return
@@ -111,7 +113,7 @@ class Analytics {
 
         const claims = getClaims()
 
-        let ageGroup: AgeGroup = "UNKNOWN"
+        let ageGroup: AgeGroup | undefined = undefined
 
         const now = new Date()
         const birthDate = claims.birthDate
@@ -127,9 +129,9 @@ class Analytics {
 
         this.setUser({
             ageGroup,
-            churchId: claims.churchId?.toString() ?? "0",
-            country: claims.country ?? "unknown",
-            gender: claims.gender ?? "unknown",
+            churchId: claims.churchId?.toString(),
+            country: claims.country,
+            gender: claims.gender,
             id: analyticsId,
         })
     }

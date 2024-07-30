@@ -1,16 +1,16 @@
 package common
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Profile is the entry point for most user-specific content
 type Profile struct {
-	ID                 uuid.UUID
-	UserID             string
-	Name               string
-	ApplicationGroupID uuid.UUID
+	ID     uuid.UUID
+	UserID string
+	Name   string
 }
 
 // Device is a profile-linked device with a token for notifications

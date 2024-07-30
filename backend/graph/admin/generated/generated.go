@@ -13,7 +13,7 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
-	"github.com/bcc-code/brunstadtv/backend/graph/admin/model"
+	"github.com/bcc-code/bcc-media-platform/backend/graph/admin/model"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )
@@ -23,6 +23,7 @@ import (
 // NewExecutableSchema creates an ExecutableSchema from the ResolverRoot interface.
 func NewExecutableSchema(cfg Config) graphql.ExecutableSchema {
 	return &executableSchema{
+		schema:     cfg.Schema,
 		resolvers:  cfg.Resolvers,
 		directives: cfg.Directives,
 		complexity: cfg.Complexity,
@@ -30,12 +31,15 @@ func NewExecutableSchema(cfg Config) graphql.ExecutableSchema {
 }
 
 type Config struct {
+	Schema     *ast.Schema
 	Resolvers  ResolverRoot
 	Directives DirectiveRoot
 	Complexity ComplexityRoot
 }
 
 type ResolverRoot interface {
+	Episodes() EpisodesResolver
+	MediaItems() MediaItemsResolver
 	Preview() PreviewResolver
 	QueryRoot() QueryRootResolver
 	Statistics() StatisticsResolver
@@ -49,6 +53,14 @@ type ComplexityRoot struct {
 		Collection func(childComplexity int) int
 		ID         func(childComplexity int) int
 		Title      func(childComplexity int) int
+	}
+
+	Episodes struct {
+		ImportTimedMetadata func(childComplexity int, episodeID string) int
+	}
+
+	MediaItems struct {
+		ImportTimedMetadata func(childComplexity int, mediaItemID string) int
 	}
 
 	Preview struct {
@@ -71,6 +83,8 @@ type ComplexityRoot struct {
 	}
 
 	QueryRoot struct {
+		Episodes   func(childComplexity int) int
+		MediaItems func(childComplexity int) int
 		Preview    func(childComplexity int) int
 		Statistics func(childComplexity int) int
 	}
@@ -80,6 +94,12 @@ type ComplexityRoot struct {
 	}
 }
 
+type EpisodesResolver interface {
+	ImportTimedMetadata(ctx context.Context, obj *model.Episodes, episodeID string) (bool, error)
+}
+type MediaItemsResolver interface {
+	ImportTimedMetadata(ctx context.Context, obj *model.MediaItems, mediaItemID string) (bool, error)
+}
 type PreviewResolver interface {
 	Collection(ctx context.Context, obj *model.Preview, filter string) (*model.PreviewCollection, error)
 	Asset(ctx context.Context, obj *model.Preview, id string) (*model.PreviewAsset, error)
@@ -87,23 +107,29 @@ type PreviewResolver interface {
 type QueryRootResolver interface {
 	Preview(ctx context.Context) (*model.Preview, error)
 	Statistics(ctx context.Context) (*model.Statistics, error)
+	Episodes(ctx context.Context) (*model.Episodes, error)
+	MediaItems(ctx context.Context) (*model.MediaItems, error)
 }
 type StatisticsResolver interface {
 	LessonProgressGroupedByOrg(ctx context.Context, obj *model.Statistics, lessonID string, ageGroups []string, orgMaxSize *int, orgMinSize *int) ([]*model.ProgressByOrg, error)
 }
 
 type executableSchema struct {
+	schema     *ast.Schema
 	resolvers  ResolverRoot
 	directives DirectiveRoot
 	complexity ComplexityRoot
 }
 
 func (e *executableSchema) Schema() *ast.Schema {
+	if e.schema != nil {
+		return e.schema
+	}
 	return parsedSchema
 }
 
 func (e *executableSchema) Complexity(typeName, field string, childComplexity int, rawArgs map[string]interface{}) (int, bool) {
-	ec := executionContext{nil, e}
+	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
 
@@ -127,6 +153,30 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CollectionItem.Title(childComplexity), true
+
+	case "Episodes.importTimedMetadata":
+		if e.complexity.Episodes.ImportTimedMetadata == nil {
+			break
+		}
+
+		args, err := ec.field_Episodes_importTimedMetadata_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Episodes.ImportTimedMetadata(childComplexity, args["episodeId"].(string)), true
+
+	case "MediaItems.importTimedMetadata":
+		if e.complexity.MediaItems.ImportTimedMetadata == nil {
+			break
+		}
+
+		args, err := ec.field_MediaItems_importTimedMetadata_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.MediaItems.ImportTimedMetadata(childComplexity, args["mediaItemId"].(string)), true
 
 	case "Preview.asset":
 		if e.complexity.Preview.Asset == nil {
@@ -187,6 +237,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ProgressByOrg.Progress(childComplexity), true
 
+	case "QueryRoot.episodes":
+		if e.complexity.QueryRoot.Episodes == nil {
+			break
+		}
+
+		return e.complexity.QueryRoot.Episodes(childComplexity), true
+
+	case "QueryRoot.mediaItems":
+		if e.complexity.QueryRoot.MediaItems == nil {
+			break
+		}
+
+		return e.complexity.QueryRoot.MediaItems(childComplexity), true
+
 	case "QueryRoot.preview":
 		if e.complexity.QueryRoot.Preview == nil {
 			break
@@ -219,25 +283,40 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	rc := graphql.GetOperationContext(ctx)
-	ec := executionContext{rc, e}
+	ec := executionContext{rc, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap()
 	first := true
 
 	switch rc.Operation.Operation {
 	case ast.Query:
 		return func(ctx context.Context) *graphql.Response {
-			if !first {
-				return nil
+			var response graphql.Response
+			var data graphql.Marshaler
+			if first {
+				first = false
+				ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
+				data = ec._QueryRoot(ctx, rc.Operation.SelectionSet)
+			} else {
+				if atomic.LoadInt32(&ec.pendingDeferred) > 0 {
+					result := <-ec.deferredResults
+					atomic.AddInt32(&ec.pendingDeferred, -1)
+					data = result.Result
+					response.Path = result.Path
+					response.Label = result.Label
+					response.Errors = result.Errors
+				} else {
+					return nil
+				}
 			}
-			first = false
-			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
-			data := ec._QueryRoot(ctx, rc.Operation.SelectionSet)
 			var buf bytes.Buffer
 			data.MarshalGQL(&buf)
-
-			return &graphql.Response{
-				Data: buf.Bytes(),
+			response.Data = buf.Bytes()
+			if atomic.LoadInt32(&ec.deferred) > 0 {
+				hasNext := atomic.LoadInt32(&ec.pendingDeferred) > 0
+				response.HasNext = &hasNext
 			}
+
+			return &response
 		}
 
 	default:
@@ -248,20 +327,42 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 type executionContext struct {
 	*graphql.OperationContext
 	*executableSchema
+	deferred        int32
+	pendingDeferred int32
+	deferredResults chan graphql.DeferredResult
+}
+
+func (ec *executionContext) processDeferredGroup(dg graphql.DeferredGroup) {
+	atomic.AddInt32(&ec.pendingDeferred, 1)
+	go func() {
+		ctx := graphql.WithFreshResponseContext(dg.Context)
+		dg.FieldSet.Dispatch(ctx)
+		ds := graphql.DeferredResult{
+			Path:   dg.Path,
+			Label:  dg.Label,
+			Result: dg.FieldSet,
+			Errors: graphql.GetErrors(ctx),
+		}
+		// null fields should bubble up
+		if dg.FieldSet.Invalids > 0 {
+			ds.Result = graphql.Null
+		}
+		ec.deferredResults <- ds
+	}()
 }
 
 func (ec *executionContext) introspectSchema() (*introspection.Schema, error) {
 	if ec.DisableIntrospection {
 		return nil, errors.New("introspection disabled")
 	}
-	return introspection.WrapSchema(parsedSchema), nil
+	return introspection.WrapSchema(ec.Schema()), nil
 }
 
 func (ec *executionContext) introspectType(name string) (*introspection.Type, error) {
 	if ec.DisableIntrospection {
 		return nil, errors.New("introspection disabled")
 	}
-	return introspection.WrapTypeFromDef(parsedSchema, parsedSchema.Types[name]), nil
+	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
 var sources = []*ast.Source{
@@ -287,6 +388,7 @@ enum Collection {
     seasons,
     episodes,
     games,
+    shorts,
 }
 
 type CollectionItem {
@@ -296,26 +398,36 @@ type CollectionItem {
 }
 
 type ProgressByOrg {
-  name: String!
-  progress: Float!
+    name: String!
+    progress: Float!
 }
 
 type Statistics {
-  lessonProgressGroupedByOrg(
-    lessonID: ID!,
-    ageGroups: [String!]!,
-    orgMaxSize: Int,
-    orgMinSize: Int,
-  ): [ProgressByOrg!]! @goField(forceResolver: true)
+    lessonProgressGroupedByOrg(
+        lessonID: ID!,
+        ageGroups: [String!]!,
+        orgMaxSize: Int,
+        orgMinSize: Int,
+    ): [ProgressByOrg!]! @goField(forceResolver: true)
 }
 
-schema{
-    query: QueryRoot
+type Episodes {
+    importTimedMetadata(episodeId: ID!): Boolean! @goField(forceResolver: true)
+}
+
+type MediaItems {
+    importTimedMetadata(mediaItemId: ID!): Boolean! @goField(forceResolver: true)
 }
 
 type QueryRoot {
     preview: Preview!
     statistics: Statistics!
+    episodes: Episodes!
+    mediaItems: MediaItems!
+}
+
+schema{
+    query: QueryRoot
 }
 `, BuiltIn: false},
 }
@@ -324,6 +436,36 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Episodes_importTimedMetadata_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["episodeId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("episodeId"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["episodeId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_MediaItems_importTimedMetadata_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["mediaItemId"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("mediaItemId"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["mediaItemId"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_Preview_asset_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -478,7 +620,7 @@ func (ec *executionContext) _CollectionItem_collection(ctx context.Context, fiel
 	}
 	res := resTmp.(model.Collection)
 	fc.Result = res
-	return ec.marshalNCollection2githubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐCollection(ctx, field.Selections, res)
+	return ec.marshalNCollection2githubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐCollection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_CollectionItem_collection(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -582,6 +724,116 @@ func (ec *executionContext) fieldContext_CollectionItem_title(ctx context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Episodes_importTimedMetadata(ctx context.Context, field graphql.CollectedField, obj *model.Episodes) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Episodes_importTimedMetadata(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Episodes().ImportTimedMetadata(rctx, obj, fc.Args["episodeId"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Episodes_importTimedMetadata(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Episodes",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Episodes_importTimedMetadata_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MediaItems_importTimedMetadata(ctx context.Context, field graphql.CollectedField, obj *model.MediaItems) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_MediaItems_importTimedMetadata(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.MediaItems().ImportTimedMetadata(rctx, obj, fc.Args["mediaItemId"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_MediaItems_importTimedMetadata(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MediaItems",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_MediaItems_importTimedMetadata_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Preview_collection(ctx context.Context, field graphql.CollectedField, obj *model.Preview) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Preview_collection(ctx, field)
 	if err != nil {
@@ -610,7 +862,7 @@ func (ec *executionContext) _Preview_collection(ctx context.Context, field graph
 	}
 	res := resTmp.(*model.PreviewCollection)
 	fc.Result = res
-	return ec.marshalNPreviewCollection2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewCollection(ctx, field.Selections, res)
+	return ec.marshalNPreviewCollection2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewCollection(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Preview_collection(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -636,7 +888,7 @@ func (ec *executionContext) fieldContext_Preview_collection(ctx context.Context,
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Preview_collection_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -669,7 +921,7 @@ func (ec *executionContext) _Preview_asset(ctx context.Context, field graphql.Co
 	}
 	res := resTmp.(*model.PreviewAsset)
 	fc.Result = res
-	return ec.marshalNPreviewAsset2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewAsset(ctx, field.Selections, res)
+	return ec.marshalNPreviewAsset2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewAsset(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Preview_asset(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -697,7 +949,7 @@ func (ec *executionContext) fieldContext_Preview_asset(ctx context.Context, fiel
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Preview_asset_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -818,7 +1070,7 @@ func (ec *executionContext) _PreviewCollection_items(ctx context.Context, field 
 	}
 	res := resTmp.([]*model.CollectionItem)
 	fc.Result = res
-	return ec.marshalNCollectionItem2ᚕᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐCollectionItemᚄ(ctx, field.Selections, res)
+	return ec.marshalNCollectionItem2ᚕᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐCollectionItemᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_PreviewCollection_items(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -958,7 +1210,7 @@ func (ec *executionContext) _QueryRoot_preview(ctx context.Context, field graphq
 	}
 	res := resTmp.(*model.Preview)
 	fc.Result = res
-	return ec.marshalNPreview2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐPreview(ctx, field.Selections, res)
+	return ec.marshalNPreview2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐPreview(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_QueryRoot_preview(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1008,7 +1260,7 @@ func (ec *executionContext) _QueryRoot_statistics(ctx context.Context, field gra
 	}
 	res := resTmp.(*model.Statistics)
 	fc.Result = res
-	return ec.marshalNStatistics2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐStatistics(ctx, field.Selections, res)
+	return ec.marshalNStatistics2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐStatistics(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_QueryRoot_statistics(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1023,6 +1275,102 @@ func (ec *executionContext) fieldContext_QueryRoot_statistics(ctx context.Contex
 				return ec.fieldContext_Statistics_lessonProgressGroupedByOrg(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Statistics", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _QueryRoot_episodes(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_QueryRoot_episodes(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.QueryRoot().Episodes(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Episodes)
+	fc.Result = res
+	return ec.marshalNEpisodes2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐEpisodes(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_QueryRoot_episodes(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "QueryRoot",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "importTimedMetadata":
+				return ec.fieldContext_Episodes_importTimedMetadata(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Episodes", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _QueryRoot_mediaItems(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_QueryRoot_mediaItems(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.QueryRoot().MediaItems(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.MediaItems)
+	fc.Result = res
+	return ec.marshalNMediaItems2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐMediaItems(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_QueryRoot_mediaItems(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "QueryRoot",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "importTimedMetadata":
+				return ec.fieldContext_MediaItems_importTimedMetadata(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MediaItems", field.Name)
 		},
 	}
 	return fc, nil
@@ -1097,7 +1445,7 @@ func (ec *executionContext) fieldContext_QueryRoot___type(ctx context.Context, f
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_QueryRoot___type_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -1185,7 +1533,7 @@ func (ec *executionContext) _Statistics_lessonProgressGroupedByOrg(ctx context.C
 	}
 	res := resTmp.([]*model.ProgressByOrg)
 	fc.Result = res
-	return ec.marshalNProgressByOrg2ᚕᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐProgressByOrgᚄ(ctx, field.Selections, res)
+	return ec.marshalNProgressByOrg2ᚕᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐProgressByOrgᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Statistics_lessonProgressGroupedByOrg(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1213,7 +1561,7 @@ func (ec *executionContext) fieldContext_Statistics_lessonProgressGroupedByOrg(c
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Statistics_lessonProgressGroupedByOrg_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -2639,7 +2987,7 @@ func (ec *executionContext) fieldContext___Type_fields(ctx context.Context, fiel
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field___Type_fields_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -2827,7 +3175,7 @@ func (ec *executionContext) fieldContext___Type_enumValues(ctx context.Context, 
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field___Type_enumValues_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
-		return
+		return fc, err
 	}
 	return fc, nil
 }
@@ -3003,41 +3351,188 @@ var collectionItemImplementors = []string{"CollectionItem"}
 
 func (ec *executionContext) _CollectionItem(ctx context.Context, sel ast.SelectionSet, obj *model.CollectionItem) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, collectionItemImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("CollectionItem")
 		case "collection":
-
 			out.Values[i] = ec._CollectionItem_collection(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "id":
-
 			out.Values[i] = ec._CollectionItem_id(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "title":
-
 			out.Values[i] = ec._CollectionItem_title(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var episodesImplementors = []string{"Episodes"}
+
+func (ec *executionContext) _Episodes(ctx context.Context, sel ast.SelectionSet, obj *model.Episodes) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, episodesImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Episodes")
+		case "importTimedMetadata":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Episodes_importTimedMetadata(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var mediaItemsImplementors = []string{"MediaItems"}
+
+func (ec *executionContext) _MediaItems(ctx context.Context, sel ast.SelectionSet, obj *model.MediaItems) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, mediaItemsImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MediaItems")
+		case "importTimedMetadata":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._MediaItems_importTimedMetadata(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3045,8 +3540,9 @@ var previewImplementors = []string{"Preview"}
 
 func (ec *executionContext) _Preview(ctx context.Context, sel ast.SelectionSet, obj *model.Preview) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, previewImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -3054,7 +3550,7 @@ func (ec *executionContext) _Preview(ctx context.Context, sel ast.SelectionSet, 
 		case "collection":
 			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
@@ -3062,19 +3558,35 @@ func (ec *executionContext) _Preview(ctx context.Context, sel ast.SelectionSet, 
 				}()
 				res = ec._Preview_collection(ctx, field, obj)
 				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
+					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
 
-			})
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "asset":
 			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
@@ -3082,23 +3594,51 @@ func (ec *executionContext) _Preview(ctx context.Context, sel ast.SelectionSet, 
 				}()
 				res = ec._Preview_asset(ctx, field, obj)
 				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
+					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
 
-			})
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3106,34 +3646,43 @@ var previewAssetImplementors = []string{"PreviewAsset"}
 
 func (ec *executionContext) _PreviewAsset(ctx context.Context, sel ast.SelectionSet, obj *model.PreviewAsset) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, previewAssetImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("PreviewAsset")
 		case "url":
-
 			out.Values[i] = ec._PreviewAsset_url(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "type":
-
 			out.Values[i] = ec._PreviewAsset_type(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3141,27 +3690,38 @@ var previewCollectionImplementors = []string{"PreviewCollection"}
 
 func (ec *executionContext) _PreviewCollection(ctx context.Context, sel ast.SelectionSet, obj *model.PreviewCollection) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, previewCollectionImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("PreviewCollection")
 		case "items":
-
 			out.Values[i] = ec._PreviewCollection_items(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3169,34 +3729,43 @@ var progressByOrgImplementors = []string{"ProgressByOrg"}
 
 func (ec *executionContext) _ProgressByOrg(ctx context.Context, sel ast.SelectionSet, obj *model.ProgressByOrg) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, progressByOrgImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("ProgressByOrg")
 		case "name":
-
 			out.Values[i] = ec._ProgressByOrg_name(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "progress":
-
 			out.Values[i] = ec._ProgressByOrg_progress(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3209,7 +3778,7 @@ func (ec *executionContext) _QueryRoot(ctx context.Context, sel ast.SelectionSet
 	})
 
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
 			Object: field.Name,
@@ -3222,7 +3791,7 @@ func (ec *executionContext) _QueryRoot(ctx context.Context, sel ast.SelectionSet
 		case "preview":
 			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
@@ -3230,22 +3799,21 @@ func (ec *executionContext) _QueryRoot(ctx context.Context, sel ast.SelectionSet
 				}()
 				res = ec._QueryRoot_preview(ctx, field)
 				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
+					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
 			}
 
 			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "statistics":
 			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
@@ -3253,38 +3821,89 @@ func (ec *executionContext) _QueryRoot(ctx context.Context, sel ast.SelectionSet
 				}()
 				res = ec._QueryRoot_statistics(ctx, field)
 				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
+					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
 			}
 
 			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return rrm(innerCtx)
-			})
-		case "__type":
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "episodes":
+			field := field
 
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._QueryRoot_episodes(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "mediaItems":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._QueryRoot_mediaItems(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._QueryRoot___type(ctx, field)
 			})
-
 		case "__schema":
-
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._QueryRoot___schema(ctx, field)
 			})
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3292,8 +3911,9 @@ var statisticsImplementors = []string{"Statistics"}
 
 func (ec *executionContext) _Statistics(ctx context.Context, sel ast.SelectionSet, obj *model.Statistics) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, statisticsImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -3301,7 +3921,7 @@ func (ec *executionContext) _Statistics(ctx context.Context, sel ast.SelectionSe
 		case "lessonProgressGroupedByOrg":
 			field := field
 
-			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
@@ -3309,23 +3929,51 @@ func (ec *executionContext) _Statistics(ctx context.Context, sel ast.SelectionSe
 				}()
 				res = ec._Statistics_lessonProgressGroupedByOrg(ctx, field, obj)
 				if res == graphql.Null {
-					atomic.AddUint32(&invalids, 1)
+					atomic.AddUint32(&fs.Invalids, 1)
 				}
 				return res
 			}
 
-			out.Concurrently(i, func() graphql.Marshaler {
-				return innerFunc(ctx)
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
 
-			})
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3333,52 +3981,55 @@ var __DirectiveImplementors = []string{"__Directive"}
 
 func (ec *executionContext) ___Directive(ctx context.Context, sel ast.SelectionSet, obj *introspection.Directive) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __DirectiveImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__Directive")
 		case "name":
-
 			out.Values[i] = ec.___Directive_name(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "description":
-
 			out.Values[i] = ec.___Directive_description(ctx, field, obj)
-
 		case "locations":
-
 			out.Values[i] = ec.___Directive_locations(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "args":
-
 			out.Values[i] = ec.___Directive_args(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "isRepeatable":
-
 			out.Values[i] = ec.___Directive_isRepeatable(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3386,42 +4037,47 @@ var __EnumValueImplementors = []string{"__EnumValue"}
 
 func (ec *executionContext) ___EnumValue(ctx context.Context, sel ast.SelectionSet, obj *introspection.EnumValue) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __EnumValueImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__EnumValue")
 		case "name":
-
 			out.Values[i] = ec.___EnumValue_name(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "description":
-
 			out.Values[i] = ec.___EnumValue_description(ctx, field, obj)
-
 		case "isDeprecated":
-
 			out.Values[i] = ec.___EnumValue_isDeprecated(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "deprecationReason":
-
 			out.Values[i] = ec.___EnumValue_deprecationReason(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3429,56 +4085,57 @@ var __FieldImplementors = []string{"__Field"}
 
 func (ec *executionContext) ___Field(ctx context.Context, sel ast.SelectionSet, obj *introspection.Field) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __FieldImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__Field")
 		case "name":
-
 			out.Values[i] = ec.___Field_name(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "description":
-
 			out.Values[i] = ec.___Field_description(ctx, field, obj)
-
 		case "args":
-
 			out.Values[i] = ec.___Field_args(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "type":
-
 			out.Values[i] = ec.___Field_type(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "isDeprecated":
-
 			out.Values[i] = ec.___Field_isDeprecated(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "deprecationReason":
-
 			out.Values[i] = ec.___Field_deprecationReason(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3486,42 +4143,47 @@ var __InputValueImplementors = []string{"__InputValue"}
 
 func (ec *executionContext) ___InputValue(ctx context.Context, sel ast.SelectionSet, obj *introspection.InputValue) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __InputValueImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__InputValue")
 		case "name":
-
 			out.Values[i] = ec.___InputValue_name(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "description":
-
 			out.Values[i] = ec.___InputValue_description(ctx, field, obj)
-
 		case "type":
-
 			out.Values[i] = ec.___InputValue_type(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "defaultValue":
-
 			out.Values[i] = ec.___InputValue_defaultValue(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3529,53 +4191,54 @@ var __SchemaImplementors = []string{"__Schema"}
 
 func (ec *executionContext) ___Schema(ctx context.Context, sel ast.SelectionSet, obj *introspection.Schema) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __SchemaImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__Schema")
 		case "description":
-
 			out.Values[i] = ec.___Schema_description(ctx, field, obj)
-
 		case "types":
-
 			out.Values[i] = ec.___Schema_types(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "queryType":
-
 			out.Values[i] = ec.___Schema_queryType(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "mutationType":
-
 			out.Values[i] = ec.___Schema_mutationType(ctx, field, obj)
-
 		case "subscriptionType":
-
 			out.Values[i] = ec.___Schema_subscriptionType(ctx, field, obj)
-
 		case "directives":
-
 			out.Values[i] = ec.___Schema_directives(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3583,63 +4246,56 @@ var __TypeImplementors = []string{"__Type"}
 
 func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, obj *introspection.Type) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, __TypeImplementors)
+
 	out := graphql.NewFieldSet(fields)
-	var invalids uint32
+	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("__Type")
 		case "kind":
-
 			out.Values[i] = ec.___Type_kind(ctx, field, obj)
-
 			if out.Values[i] == graphql.Null {
-				invalids++
+				out.Invalids++
 			}
 		case "name":
-
 			out.Values[i] = ec.___Type_name(ctx, field, obj)
-
 		case "description":
-
 			out.Values[i] = ec.___Type_description(ctx, field, obj)
-
 		case "fields":
-
 			out.Values[i] = ec.___Type_fields(ctx, field, obj)
-
 		case "interfaces":
-
 			out.Values[i] = ec.___Type_interfaces(ctx, field, obj)
-
 		case "possibleTypes":
-
 			out.Values[i] = ec.___Type_possibleTypes(ctx, field, obj)
-
 		case "enumValues":
-
 			out.Values[i] = ec.___Type_enumValues(ctx, field, obj)
-
 		case "inputFields":
-
 			out.Values[i] = ec.___Type_inputFields(ctx, field, obj)
-
 		case "ofType":
-
 			out.Values[i] = ec.___Type_ofType(ctx, field, obj)
-
 		case "specifiedByURL":
-
 			out.Values[i] = ec.___Type_specifiedByURL(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
-	out.Dispatch()
-	if invalids > 0 {
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
 		return graphql.Null
 	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
 	return out
 }
 
@@ -3662,17 +4318,17 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) unmarshalNCollection2githubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐCollection(ctx context.Context, v interface{}) (model.Collection, error) {
+func (ec *executionContext) unmarshalNCollection2githubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐCollection(ctx context.Context, v interface{}) (model.Collection, error) {
 	var res model.Collection
 	err := res.UnmarshalGQL(v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNCollection2githubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐCollection(ctx context.Context, sel ast.SelectionSet, v model.Collection) graphql.Marshaler {
+func (ec *executionContext) marshalNCollection2githubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐCollection(ctx context.Context, sel ast.SelectionSet, v model.Collection) graphql.Marshaler {
 	return v
 }
 
-func (ec *executionContext) marshalNCollectionItem2ᚕᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐCollectionItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CollectionItem) graphql.Marshaler {
+func (ec *executionContext) marshalNCollectionItem2ᚕᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐCollectionItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CollectionItem) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -3696,7 +4352,7 @@ func (ec *executionContext) marshalNCollectionItem2ᚕᚖgithubᚗcomᚋbccᚑco
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNCollectionItem2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐCollectionItem(ctx, sel, v[i])
+			ret[i] = ec.marshalNCollectionItem2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐCollectionItem(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -3716,7 +4372,7 @@ func (ec *executionContext) marshalNCollectionItem2ᚕᚖgithubᚗcomᚋbccᚑco
 	return ret
 }
 
-func (ec *executionContext) marshalNCollectionItem2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐCollectionItem(ctx context.Context, sel ast.SelectionSet, v *model.CollectionItem) graphql.Marshaler {
+func (ec *executionContext) marshalNCollectionItem2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐCollectionItem(ctx context.Context, sel ast.SelectionSet, v *model.CollectionItem) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -3724,6 +4380,20 @@ func (ec *executionContext) marshalNCollectionItem2ᚖgithubᚗcomᚋbccᚑcode�
 		return graphql.Null
 	}
 	return ec._CollectionItem(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNEpisodes2githubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐEpisodes(ctx context.Context, sel ast.SelectionSet, v model.Episodes) graphql.Marshaler {
+	return ec._Episodes(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNEpisodes2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐEpisodes(ctx context.Context, sel ast.SelectionSet, v *model.Episodes) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Episodes(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v interface{}) (float64, error) {
@@ -3756,11 +4426,25 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 	return res
 }
 
-func (ec *executionContext) marshalNPreview2githubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐPreview(ctx context.Context, sel ast.SelectionSet, v model.Preview) graphql.Marshaler {
+func (ec *executionContext) marshalNMediaItems2githubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐMediaItems(ctx context.Context, sel ast.SelectionSet, v model.MediaItems) graphql.Marshaler {
+	return ec._MediaItems(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNMediaItems2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐMediaItems(ctx context.Context, sel ast.SelectionSet, v *model.MediaItems) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._MediaItems(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPreview2githubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐPreview(ctx context.Context, sel ast.SelectionSet, v model.Preview) graphql.Marshaler {
 	return ec._Preview(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNPreview2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐPreview(ctx context.Context, sel ast.SelectionSet, v *model.Preview) graphql.Marshaler {
+func (ec *executionContext) marshalNPreview2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐPreview(ctx context.Context, sel ast.SelectionSet, v *model.Preview) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -3770,11 +4454,11 @@ func (ec *executionContext) marshalNPreview2ᚖgithubᚗcomᚋbccᚑcodeᚋbruns
 	return ec._Preview(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNPreviewAsset2githubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewAsset(ctx context.Context, sel ast.SelectionSet, v model.PreviewAsset) graphql.Marshaler {
+func (ec *executionContext) marshalNPreviewAsset2githubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewAsset(ctx context.Context, sel ast.SelectionSet, v model.PreviewAsset) graphql.Marshaler {
 	return ec._PreviewAsset(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNPreviewAsset2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewAsset(ctx context.Context, sel ast.SelectionSet, v *model.PreviewAsset) graphql.Marshaler {
+func (ec *executionContext) marshalNPreviewAsset2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewAsset(ctx context.Context, sel ast.SelectionSet, v *model.PreviewAsset) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -3784,11 +4468,11 @@ func (ec *executionContext) marshalNPreviewAsset2ᚖgithubᚗcomᚋbccᚑcodeᚋ
 	return ec._PreviewAsset(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNPreviewCollection2githubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewCollection(ctx context.Context, sel ast.SelectionSet, v model.PreviewCollection) graphql.Marshaler {
+func (ec *executionContext) marshalNPreviewCollection2githubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewCollection(ctx context.Context, sel ast.SelectionSet, v model.PreviewCollection) graphql.Marshaler {
 	return ec._PreviewCollection(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNPreviewCollection2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewCollection(ctx context.Context, sel ast.SelectionSet, v *model.PreviewCollection) graphql.Marshaler {
+func (ec *executionContext) marshalNPreviewCollection2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐPreviewCollection(ctx context.Context, sel ast.SelectionSet, v *model.PreviewCollection) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -3798,7 +4482,7 @@ func (ec *executionContext) marshalNPreviewCollection2ᚖgithubᚗcomᚋbccᚑco
 	return ec._PreviewCollection(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNProgressByOrg2ᚕᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐProgressByOrgᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ProgressByOrg) graphql.Marshaler {
+func (ec *executionContext) marshalNProgressByOrg2ᚕᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐProgressByOrgᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ProgressByOrg) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -3822,7 +4506,7 @@ func (ec *executionContext) marshalNProgressByOrg2ᚕᚖgithubᚗcomᚋbccᚑcod
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNProgressByOrg2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐProgressByOrg(ctx, sel, v[i])
+			ret[i] = ec.marshalNProgressByOrg2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐProgressByOrg(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -3842,7 +4526,7 @@ func (ec *executionContext) marshalNProgressByOrg2ᚕᚖgithubᚗcomᚋbccᚑcod
 	return ret
 }
 
-func (ec *executionContext) marshalNProgressByOrg2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐProgressByOrg(ctx context.Context, sel ast.SelectionSet, v *model.ProgressByOrg) graphql.Marshaler {
+func (ec *executionContext) marshalNProgressByOrg2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐProgressByOrg(ctx context.Context, sel ast.SelectionSet, v *model.ProgressByOrg) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -3852,11 +4536,11 @@ func (ec *executionContext) marshalNProgressByOrg2ᚖgithubᚗcomᚋbccᚑcode�
 	return ec._ProgressByOrg(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNStatistics2githubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐStatistics(ctx context.Context, sel ast.SelectionSet, v model.Statistics) graphql.Marshaler {
+func (ec *executionContext) marshalNStatistics2githubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐStatistics(ctx context.Context, sel ast.SelectionSet, v model.Statistics) graphql.Marshaler {
 	return ec._Statistics(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNStatistics2ᚖgithubᚗcomᚋbccᚑcodeᚋbrunstadtvᚋbackendᚋgraphᚋadminᚋmodelᚐStatistics(ctx context.Context, sel ast.SelectionSet, v *model.Statistics) graphql.Marshaler {
+func (ec *executionContext) marshalNStatistics2ᚖgithubᚗcomᚋbccᚑcodeᚋbccᚑmediaᚑplatformᚋbackendᚋgraphᚋadminᚋmodelᚐStatistics(ctx context.Context, sel ast.SelectionSet, v *model.Statistics) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")

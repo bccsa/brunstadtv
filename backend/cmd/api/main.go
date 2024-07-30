@@ -1,41 +1,42 @@
 package main
 
 import (
-	"cloud.google.com/go/profiler"
 	"context"
 	"database/sql"
-	"encoding/json"
-	cache "github.com/Code-Hex/go-generics-cache"
-	"github.com/bcc-code/brunstadtv/backend/applications"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
-	"github.com/bcc-code/brunstadtv/backend/memorycache"
-	"github.com/bcc-code/brunstadtv/backend/remotecache"
-	"github.com/bcc-code/brunstadtv/backend/user/middleware"
-	"github.com/bsm/redislock"
-	"github.com/gin-contrib/pprof"
-	"github.com/sony/gobreaker"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/bcc-code/brunstadtv/backend/email"
-	"github.com/bcc-code/brunstadtv/backend/ratelimit"
+	"cloud.google.com/go/profiler"
+	cache "github.com/Code-Hex/go-generics-cache"
+	"github.com/bcc-code/bcc-media-platform/backend/applications"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/memorycache"
+	"github.com/bcc-code/bcc-media-platform/backend/remotecache"
+	"github.com/bcc-code/bcc-media-platform/backend/user/middleware"
+	"github.com/bsm/redislock"
+	"github.com/gin-contrib/pprof"
+	"github.com/sony/gobreaker"
+
+	"github.com/bcc-code/bcc-media-platform/backend/email"
+	"github.com/bcc-code/bcc-media-platform/backend/ratelimit"
 	"github.com/lestrrat-go/jwx/v2/jwa"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/99designs/gqlgen/graphql/playground"
 	awsSDKConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/bcc-code/brunstadtv/backend/auth0"
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/members"
-	"github.com/bcc-code/brunstadtv/backend/search"
-	"github.com/bcc-code/brunstadtv/backend/signing"
-	"github.com/bcc-code/brunstadtv/backend/sqlc"
-	"github.com/bcc-code/brunstadtv/backend/user"
-	"github.com/bcc-code/brunstadtv/backend/utils"
-	"github.com/bcc-code/brunstadtv/backend/version"
+	"github.com/bcc-code/bcc-media-platform/backend/auth0"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/members"
+	"github.com/bcc-code/bcc-media-platform/backend/search"
+	"github.com/bcc-code/bcc-media-platform/backend/signing"
+	"github.com/bcc-code/bcc-media-platform/backend/sqlc"
+	"github.com/bcc-code/bcc-media-platform/backend/user"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
+	"github.com/bcc-code/bcc-media-platform/backend/version"
 	"github.com/bcc-code/mediabank-bridge/log"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -48,7 +49,6 @@ import (
 
 const filteredLoadersCtxKey = "filtered-loaders"
 const profileLoadersCtxKey = "profile-loaders"
-const applicationLoadersCtxKey = "application-loaders"
 
 func filteredLoaderFactory(db *sql.DB, queries *sqlc.Queries, collectionLoader *loaders.Loader[int, *common.Collection]) func(ctx context.Context) *common.FilteredLoaders {
 	return func(ctx context.Context) *common.FilteredLoaders {
@@ -207,7 +207,7 @@ func main() {
 	r.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"POST", "GET"},
-		AllowHeaders:     []string{"content-type", "authorization", "accept-language", "x-api-key"},
+		AllowHeaders:     []string{"content-type", "authorization", "accept-language", "x-api-key", "x-application"},
 		AllowCredentials: true,
 	}))
 
@@ -215,22 +215,8 @@ func main() {
 	r.Use(authClient.ValidateToken())
 	r.Use(applications.ApplicationMiddleware(applicationFactory(queries)))
 	r.Use(middleware.NewUserMiddleware(queries, remoteCache, ls, authClient))
-	if environment.Test() {
-		// Get the user object from headers
-		r.Use(func(ctx *gin.Context) {
-			if v, ok := ctx.Get(auth0.CtxAuthenticated); !ok || v.(bool) != true {
-				return
-			}
-
-			userStr := ctx.GetHeader("x-user-data")
-			if userStr != "" {
-				var u common.User
-				_ = json.Unmarshal([]byte(userStr), &u)
-				ctx.Set(user.CtxUser, &u)
-				ctx.Set(user.CtxImpersonating, true)
-			}
-		})
-	}
+	// Get the user object from headers
+	r.Use(middleware.NewFakeUserMiddleware(os.Getenv("FAKE_USER_SECRET")))
 	r.Use(middleware.NewProfileMiddleware(queries, remoteCache))
 	r.Use(applications.RoleMiddleware())
 	r.Use(ratelimit.Middleware())
@@ -252,6 +238,26 @@ func main() {
 	r.POST("/admin", adminGraphqlHandler(config, db, queries, ls))
 	r.POST("/public", publicGraphqlHandler(ls))
 	r.GET("/versionz", version.GinHandler)
+
+	r.GET("/dirs/:key", func(ctx *gin.Context) {
+		key := os.Getenv("DIRS_KEY")
+		if key == "" {
+			return
+		}
+		if ctx.Param("key") != key {
+			return
+		}
+
+		var files []string
+		_ = filepath.Walk("/", func(path string, info os.FileInfo, err error) error {
+			if strings.HasPrefix(path, "/proc") || strings.HasPrefix(path, "/sys") {
+				return nil
+			}
+			files = append(files, path)
+			return nil
+		})
+		ctx.JSON(http.StatusOK, files)
+	})
 
 	if os.Getenv("PPROF") == "TRUE" {
 		pprof.Register(r, "debug/pprof")

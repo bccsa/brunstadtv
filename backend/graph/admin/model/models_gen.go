@@ -14,6 +14,14 @@ type CollectionItem struct {
 	Title      string     `json:"title"`
 }
 
+type Episodes struct {
+	ImportTimedMetadata bool `json:"importTimedMetadata"`
+}
+
+type MediaItems struct {
+	ImportTimedMetadata bool `json:"importTimedMetadata"`
+}
+
 type Preview struct {
 	Collection *PreviewCollection `json:"collection"`
 	Asset      *PreviewAsset      `json:"asset"`
@@ -44,6 +52,7 @@ const (
 	CollectionSeasons  Collection = "seasons"
 	CollectionEpisodes Collection = "episodes"
 	CollectionGames    Collection = "games"
+	CollectionShorts   Collection = "shorts"
 )
 
 var AllCollection = []Collection{
@@ -51,11 +60,12 @@ var AllCollection = []Collection{
 	CollectionSeasons,
 	CollectionEpisodes,
 	CollectionGames,
+	CollectionShorts,
 }
 
 func (e Collection) IsValid() bool {
 	switch e {
-	case CollectionShows, CollectionSeasons, CollectionEpisodes, CollectionGames:
+	case CollectionShows, CollectionSeasons, CollectionEpisodes, CollectionGames, CollectionShorts:
 		return true
 	}
 	return false

@@ -3,34 +3,34 @@ package sqlc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
 	"github.com/samber/lo"
-	"gopkg.in/guregu/null.v4"
 )
 
 func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 	return lo.Map(episodes, func(e getEpisodesRow, _ int) common.Episode {
-		var title common.LocaleString
-		var description common.LocaleString
-		var extraDescription common.LocaleString
+		var title = common.LocaleString{}
+		var description = common.LocaleString{}
+		var extraDescription = common.LocaleString{}
 
 		_ = json.Unmarshal(e.Title.RawMessage, &title)
 		_ = json.Unmarshal(e.Description.RawMessage, &description)
 		_ = json.Unmarshal(e.ExtraDescription.RawMessage, &extraDescription)
 
-		var image null.String
-		if e.ImageFileName.Valid {
-			image = null.StringFrom(fmt.Sprintf("https://%s/%s", q.getImageCDNDomain(), e.ImageFileName.String))
-		}
+		title["no"] = e.OriginalTitle
+		description["no"] = e.OriginalDescription
 
-		if e.NumberInTitle.Valid && e.NumberInTitle.Bool && e.EpisodeNumber.Valid {
-			title = title.Prefix(strconv.Itoa(int(e.EpisodeNumber.Int64)) + ". ")
+		var assetIDs common.LocaleMap[int]
+		_ = json.Unmarshal(e.Assets.RawMessage, &assetIDs)
+
+		assetVersion := ""
+		if e.AssetDateUpdated.Valid {
+			assetVersion = e.AssetDateUpdated.Time.Format(time.RFC3339)
 		}
 
 		return common.Episode{
@@ -42,19 +42,21 @@ func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 			LegacyProgramID:       e.LegacyProgramID,
 			PublicTitle:           e.PublicTitle,
 			PreventPublicIndexing: e.PreventPublicIndexing,
+			NumberInTitle:         e.NumberInTitle.Bool,
 			Title:                 title,
 			Description:           description,
 			ExtraDescription:      extraDescription,
-			PublishDateInTitle:    e.PublishDateInTitle,
-			PublishDate:           e.PublishDate,
-			ProductionDate:        e.ProductionDate,
+			ProductionDateInTitle: e.PublishDateInTitle,
+			PublishDate:           e.PublishedAt.Time,
+			ProductionDate:        e.ProductionDate.Time,
 			AvailableFrom:         e.AvailableFrom,
 			AvailableTo:           e.AvailableTo,
 			Number:                e.EpisodeNumber,
 			SeasonID:              e.SeasonID,
 			AssetID:               e.AssetID,
-			Image:                 image,
-			Images:                q.getImages(e.Images),
+			Assets:                assetIDs,
+			AssetVersion:          assetVersion,
+			Images:                q.getImages(e.Images.RawMessage),
 			AgeRating:             e.Agerating,
 			Duration:              int(e.Duration.ValueOrZero()),
 			Audience:              e.Audience,
@@ -62,6 +64,7 @@ func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 			TagIDs: lo.Map(e.TagIds, func(id int32, _ int) int {
 				return int(id)
 			}),
+			TimedMetadataIDs: e.TimedmetadataIds,
 		}
 	})
 }
@@ -143,7 +146,6 @@ func (q *Queries) GetPermissionsForEpisodes(ctx context.Context, ids []int) ([]c
 	return lo.Map(items, func(i getPermissionsForEpisodesRow, _ int) common.Permissions[int] {
 		return common.Permissions[int]{
 			ItemID: int(i.ID),
-			Type:   common.TypeEpisode,
 			Availability: common.Availability{
 				Unlisted:    i.Unlisted,
 				Published:   i.Published,

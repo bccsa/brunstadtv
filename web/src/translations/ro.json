@@ -5,6 +5,7 @@
         "logout": "Deconectare",
         "stayLoggedOut": "Rămâneți deconectat",
         "cancel": "Anulare",
+        "accept": "Accept",
         "submit": "Trimite",
         "back": "Înapoi",
         "next": "Urmează",
@@ -15,7 +16,13 @@
         "send": "Trimite",
         "start": "Începe",
         "skip": "Sări peste",
-        "join": "Alătură-te"
+        "join": "Alătură-te",
+        "open": "Deschide"
+    },
+    "download": {
+        "resolution": "Rezoluție",
+        "language": "Limbă",
+        "progress": "Progres"
     },
     "error": {
         "couldntSendYourMessage": "Nu am putut trimite mesajul dvs",
@@ -28,7 +35,7 @@
     "page": {
         "home": "Acasă",
         "search": "Căutare",
-        "live": "În direct",
+        "live": "Direct",
         "calendar": "Calendar",
         "faq": "Întrebări frecvente",
         "notFound": "Pagina nu a fost găsită",
@@ -72,7 +79,9 @@
         }
     },
     "live": {
-        "now": "Acum"
+        "now": "Acum",
+        "title": "Aplicație nouă pentru transmisiuni în direct",
+        "description": "Ne pare rău! Nu mai poți viziona transmisiuni în direct pe acest site. Faceți clic pe link pentru a accesa noua soluție!"
     },
     "calendar": {
         "noScheduledEvents": "Nu sunt evenimente programate",
@@ -92,6 +101,7 @@
         "title": "Titlu",
         "subject": "Subiect",
         "content": "Conţinut",
+        "faq": "Întrebări frecvente",
         "describeIssue": "Descrie problema in detaliu."
     },
     "study": {
@@ -137,15 +147,24 @@
     "footer": {
         "cookies": "Cookie-uri",
         "privacyPolicy": "Politica de Confidențialitate",
-        "information": "BCC Media este o fundație media din [Federația BCC](https://bcc.no) care produce și distribuie conținut cu valori pozitive și creștine.\n\nBCC Media este un transmițător înregistrat și respectă reglementările prevăzute în Legea Norvegiană de Difuzare. Organismul de supraveghere pentru această Lege este [Autoritatea Media Norvegiană](https://medietilsynet.no/).",
+        "information": "",
         "headOffice": "Sediul central",
         "contactUs": "Contactează-ne",
-        "downloadApp": "Descarcă aplicația noastră"
+        "downloadApp": "Descarcă aplicația noastră",
+        "termsOfUse": "Termeni de utilizare"
+    },
+    "terms": {
+        "byDownloadingYouAcceptTerms": "Prin descărcarea acestui video, accepți [termenii de utilizare](https://bcc.media/terms-of-use) și [politica de confidențialitate](https://bcc.media/privacy)."
     },
     "share": {
         "title": "Distribuie",
         "copied": "S-a copiat în memorie",
         "membersOnly": "Acest video este accesibil doar pentru utilizatorii conectați cu cont personal."
+    },
+    "quotes": {
+        "quoteOfTheDay": "",
+        "markAsRead": "",
+        "markAsUnread": ""
     },
     "feedback": {
         "appreciated": "Apreciem feedbackul tău.",
@@ -153,11 +172,44 @@
         "episodeTitle": "Cum ai evalua acest episod?",
         "howEasyToUnderstand": "Cât de ușor a fost să înțelegi videoul?",
         "anonymousInfo": "Evaluarea ta va fi transmisă în mod anonim",
-        "placeholder": "Te rugăm să fii cât mai detaliat posibil pentru a ne ajuta să înțelegem."
+        "placeholder": "Te rugăm să fii cât mai detaliat posibil pentru a ne ajuta să înțelegem.",
+        "giveFeedback": ""
     },
     "contactLocalBukIfWrong": "Contactează persoana responsabilă din asociața ta locală BUK dacă tu crezi că acest lucru este greșit.",
     "thankYou": "Mulțumim!",
     "yourResponseHasBeenSubmitted": "Răspunsul tău a fost trimis.",
     "sending": "Se trimite",
-    "defaultInputPlaceholder": "Începe să scrii aici..."
+    "defaultInputPlaceholder": "Începe să scrii aici...",
+    "requests": {
+        "name": "Numele tău",
+        "email": "Email",
+        "role": "Rolul tău",
+        "what": "Material care trebuie solicitat",
+        "how": "Cum va fi folosit materialul?",
+        "howDescription": "Prezentat parțial/complet, editat...",
+        "where": "Unde va fi utilizat materialul?",
+        "when": "Când va fi folosit materialul?",
+        "clear": "Golește",
+        "send": "Trimite",
+        "editor": "Editor",
+        "director": "Director",
+        "producer": "Producător",
+        "eventCamp": "Eveniment/tabără",
+        "local": "Adunare locală",
+        "mediaResponsible": "Responsabil media",
+        "other": "Altele",
+        "confirmSend": "Să trimiți cererea de materiale?",
+        "title": "Cerere pentru materiale",
+        "description": "Formular pentru cerere de materiale audio, foto și video de la BCC Media",
+        "receitTitle": "Cerere primită",
+        "confirmAgenda": "Confirm că materialul va fi utilizat numai în scopul convenit.",
+        "receitDescription": "Echipa noastră vă va contacta în termen de 7 zile lucrătoare. Un răspuns automat a fost trimis pe adresa ta de e-mail."
+    },
+    "shorts": {
+        "watchOnOurApp": "Descarcă aplicația mobilă pentru a viziona scurtmetraje."
+    },
+    "subscriptions": {
+        "subscribe": "",
+        "unsubscribe": ""
+    }
 }

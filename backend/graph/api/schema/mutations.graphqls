@@ -2,7 +2,9 @@ type MutationRoot {
     setDevicePushToken(token: String!, languages: [String!]!): Device
     setEpisodeProgress(id: ID!, progress: Int, duration: Int, context: EpisodeContext): Episode!
 
-    sendSupportEmail(title: String!, content: String!, html: String!): Boolean!
+    setShortProgress(id: UUID!, progress: Float, duration: Float): Short!
+
+    sendSupportEmail(title: String!, content: String!, html: String!, options: EmailOptions): Boolean!
 
     completeTask(
         id: ID!,
@@ -24,11 +26,19 @@ type MutationRoot {
 
     addEpisodeToMyList(episodeId: ID!): AddToCollectionResult!
     addShowToMyList(showId: ID!): AddToCollectionResult!
+    addShortToMyList(shortId: ID!): AddToCollectionResult!
 
     removeEntryFromMyList(entryId: UUID!): UserCollection!
 
     updateUserMetadata(birthData: BirthOptions!, nameData: NameOptions!): Boolean!
     sendVerificationEmail: Boolean!
+
+    subscribe(topic: SubscriptionTopic!): Boolean!
+    unsubscribe(topic: SubscriptionTopic!): Boolean!
+}
+
+enum SubscriptionTopic {
+    comics
 }
 
 type AnswerSurveyQuestionResult {
@@ -47,4 +57,9 @@ input BirthOptions {
 input NameOptions {
     first: String!
     last: String!
+}
+
+input EmailOptions {
+    name: String!
+    email: String!
 }
