@@ -5,7 +5,6 @@
         ref="imageContainer"
     >
         <img
-            class="object-cover w-full transition"
             ref="image"
             class="object-cover h-full w-full transition" 
             :class="[!loaded ? 'opacity-0' : 'opacity-100']"
