@@ -63,7 +63,6 @@ type Availability struct {
 // Permissions contains permissions that restrict access to items
 type Permissions[k comparable] struct {
 	ItemID       k
-	Type         ItemCollection
 	Availability Availability
 	Roles        Roles
 }
@@ -81,17 +80,22 @@ type GlobalConfig struct {
 
 // Notification contains notification data
 type Notification struct {
-	ID            uuid.UUID
-	Status        Status
-	Title         LocaleString           `json:"title"`
-	Description   LocaleString           `json:"description"`
-	Images        LocaleMap[null.String] `json:"images"`
-	ScheduleAt    null.Time              `json:"scheduleAt"`
-	SendStarted   null.Time              `json:"sendStarted"`
-	SendCompleted null.Time              `json:"sendCompleted"`
-	DeepLink      null.String            `json:"deepLink"`
-	Action        null.String            `json:"action"`
-	TargetIDs     []uuid.UUID            `json:"targetIds"`
+	ID                 uuid.UUID
+	Status             Status
+	Title              LocaleString           `json:"title"`
+	Description        LocaleString           `json:"description"`
+	Images             LocaleMap[null.String] `json:"images"`
+	ScheduleAt         null.Time              `json:"scheduleAt"`
+	SendStarted        null.Time              `json:"sendStarted"`
+	SendCompleted      null.Time              `json:"sendCompleted"`
+	DeepLink           null.String            `json:"deepLink"`
+	Action             null.String            `json:"action"`
+	HighPriority       bool                   `json:"highPriority"`
+	TargetIDs          []uuid.UUID            `json:"targetIds"`
+	ApplicationGroupID uuid.UUID
+
+	// inherited from the application group
+	FirebaseProjectID null.String `json:"firebaseProjectId"`
 }
 
 // Target specific groups
@@ -116,6 +120,8 @@ type Progress struct {
 // EpisodeContext contains context for episode
 type EpisodeContext struct {
 	CollectionID null.Int
+	Cursor       null.String
+	Shuffle      null.Bool
 }
 
 // Identifier contains basic data for identifying an item in a list

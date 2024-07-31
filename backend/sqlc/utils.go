@@ -2,17 +2,15 @@ package sqlc
 
 import (
 	"encoding/json"
-	"github.com/bcc-code/brunstadtv/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
 	"gopkg.in/guregu/null.v4"
 )
 
-func toLocaleString(msg json.RawMessage, withOriginal null.String) common.LocaleString {
-	r := unmarshalTo[common.LocaleString](msg)
-	if withOriginal.Valid {
-		if r == nil {
-			r = common.LocaleString{}
-		}
-		r["no"] = withOriginal
+func toLocaleString(msg json.RawMessage, original string) common.LocaleString {
+	var r = common.LocaleString{}
+	if original != "" {
+		_ = json.Unmarshal(msg, &r)
+		r["no"] = null.StringFrom(original)
 	}
 	return r
 }

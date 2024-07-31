@@ -1,0 +1,35 @@
+{
+    "name": "directus-extension-endpoint-tools",
+    "description": "Please enter a description for your extension",
+    "icon": "extension",
+    "version": "1.0.0",
+    "keywords": [
+        "directus",
+        "directus-extension",
+        "directus-custom-endpoint"
+    ],
+    "directus:extension": {
+        "type": "endpoint",
+        "path": "../../../cms/extensions/endpoints/tools/index.cjs",
+        "source": "src/index.ts",
+        "host": "^10.0.0"
+    },
+    "scripts": {
+        "build": "directus-extension build",
+        "dev": "directus-extension build -w --no-minify",
+        "link": "directus-extension link"
+    },
+    "devDependencies": {
+        "@directus/extensions-sdk": "^10.1.11",
+        "@types/node": "^20.8.3",
+        "typescript": "^5.2.2"
+    },
+    "peerDependencies": {
+        "@directus/types": "^9.26.0",
+        "axios": "^1.4.0"
+    },
+    "dependencies": {
+        "@google-cloud/pubsub": "^4.0.6",
+        "cloudevents": "^8.0.0"
+    }
+}

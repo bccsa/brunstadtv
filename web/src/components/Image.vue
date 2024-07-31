@@ -5,6 +5,7 @@
         ref="imageContainer"
     >
         <img
+            class="object-cover w-full transition"
             ref="image"
             class="object-cover h-full w-full transition" 
             :class="[!loaded ? 'opacity-0' : 'opacity-100']"
@@ -12,12 +13,15 @@
             :width="effectiveWidth"
             :loading="loading"
             :draggable="draggable"
+            @load="loaded = true"
+            :src="effectiveSrc"
         />
     </div>
 </template>
+
 <script lang="ts" setup>
 import { getImageSize } from "@/utils/images"
-import { computed, onMounted, ref } from "vue"
+import { computed, onMounted, ref, onBeforeUnmount } from "vue"
 
 const props = defineProps<{
     src?: string | null
@@ -29,11 +33,29 @@ const props = defineProps<{
 
 const loaded = ref(false)
 
-const image = ref(null as HTMLImageElement | null)
 const imageContainer = ref(null as HTMLDivElement | null)
 const parentDimensions = ref({
     height: 100,
     width: 100,
+})
+
+const handleResize = () => {
+    const dimensions = {
+        height: 100,
+        width: 100,
+    }
+    const parent = imageContainer.value
+    if (parent) {
+        dimensions.height = parent.clientHeight
+        dimensions.width = parent.clientWidth
+    }
+    parentDimensions.value = dimensions
+}
+
+onBeforeUnmount(() => {
+    window.removeEventListener("resize", handleResize)
+    handleResize()
+    window.addEventListener("resize", handleResize)
 })
 
 onMounted(() => {

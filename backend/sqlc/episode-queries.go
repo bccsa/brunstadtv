@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/google/uuid"
 
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v4"
 )
@@ -24,13 +23,12 @@ func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 		_ = json.Unmarshal(e.Description.RawMessage, &description)
 		_ = json.Unmarshal(e.ExtraDescription.RawMessage, &extraDescription)
 
+		var assetIDs common.LocaleMap[int]
+		_ = json.Unmarshal(e.Assets.RawMessage, &assetIDs)
+
 		var image null.String
 		if e.ImageFileName.Valid {
 			image = null.StringFrom(fmt.Sprintf("https://%s/%s", q.getImageCDNDomain(), e.ImageFileName.String))
-		}
-
-		if e.NumberInTitle.Valid && e.NumberInTitle.Bool && e.EpisodeNumber.Valid {
-			title = title.Prefix(strconv.Itoa(int(e.EpisodeNumber.Int64)) + ". ")
 		}
 
 		return common.Episode{
@@ -42,10 +40,11 @@ func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 			LegacyProgramID:       e.LegacyProgramID,
 			PublicTitle:           e.PublicTitle,
 			PreventPublicIndexing: e.PreventPublicIndexing,
+			NumberInTitle:         e.NumberInTitle.Bool,
 			Title:                 title,
 			Description:           description,
 			ExtraDescription:      extraDescription,
-			PublishDateInTitle:    e.PublishDateInTitle,
+			ProductionDateInTitle: e.PublishDateInTitle,
 			PublishDate:           e.PublishDate,
 			ProductionDate:        e.ProductionDate,
 			AvailableFrom:         e.AvailableFrom,
@@ -53,6 +52,7 @@ func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 			Number:                e.EpisodeNumber,
 			SeasonID:              e.SeasonID,
 			AssetID:               e.AssetID,
+			Assets:                assetIDs,
 			Image:                 image,
 			Images:                q.getImages(e.Images),
 			AgeRating:             e.Agerating,
@@ -62,6 +62,8 @@ func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 			TagIDs: lo.Map(e.TagIds, func(id int32, _ int) int {
 				return int(id)
 			}),
+			TimedMetadataIDs:       e.TimedmetadataIds,
+			TimedMetadataFromAsset: e.TimedmetadataFromAsset,
 		}
 	})
 }
@@ -143,7 +145,6 @@ func (q *Queries) GetPermissionsForEpisodes(ctx context.Context, ids []int) ([]c
 	return lo.Map(items, func(i getPermissionsForEpisodesRow, _ int) common.Permissions[int] {
 		return common.Permissions[int]{
 			ItemID: int(i.ID),
-			Type:   common.TypeEpisode,
 			Availability: common.Availability{
 				Unlisted:    i.Unlisted,
 				Published:   i.Published,

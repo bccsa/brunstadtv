@@ -2,12 +2,14 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/user"
-	"github.com/bcc-code/brunstadtv/backend/utils"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/user"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 )
 
 // EpisodeFrom coverts a common.Episode into an GQL episode type
@@ -64,6 +66,11 @@ func EpisodeFrom(ctx context.Context, e *common.Episode) *Episode {
 		episodeType = EpisodeTypeStandalone
 	}
 
+	var title = e.Title.Get(languages)
+	if e.ProductionDateInTitle {
+		title = fmt.Sprintf("%s %s", strings.TrimSpace(title), utils.FormatInLocale(e.ProductionDate, languages))
+	}
+
 	episode := &Episode{
 		Chapters:              []*Chapter{}, // Currently not supported
 		ID:                    strconv.Itoa(e.ID),
@@ -74,10 +81,10 @@ func EpisodeFrom(ctx context.Context, e *common.Episode) *Episode {
 		LegacyID:              legacyID,
 		LegacyProgramID:       legacyProgramID,
 		ProductionDate:        e.ProductionDate.Format(time.RFC3339),
-		ProductionDateInTitle: e.PublishDateInTitle,
+		ProductionDateInTitle: e.ProductionDateInTitle,
 		AvailableFrom:         e.AvailableFrom.Format(time.RFC3339),
 		AvailableTo:           e.AvailableTo.Format(time.RFC3339),
-		Title:                 e.Title.Get(languages),
+		Title:                 title,
 		Description:           e.Description.Get(languages),
 		ExtraDescription:      extraDescription,
 		Season:                season,
@@ -95,22 +102,8 @@ func EpisodeFrom(ctx context.Context, e *common.Episode) *Episode {
 	return episode
 }
 
-// EpisodeItemFrom converts a common.Episode into a GQL Episode Item
-func EpisodeItemFrom(ctx context.Context, e *common.Episode, sort int) *EpisodeItem {
-	episode := EpisodeFrom(ctx, e)
-
-	return &EpisodeItem{
-		ID:       episode.ID,
-		Title:    episode.Title,
-		Episode:  episode,
-		ImageURL: episode.ImageURL,
-		Images:   episode.Images,
-		Sort:     sort,
-	}
-}
-
 // EpisodeSectionItemFrom returns a SectionItem
-func EpisodeSectionItemFrom(ctx context.Context, s *common.Episode, sort int, sectionStyle string) *SectionItem {
+func EpisodeSectionItemFrom(ctx context.Context, s *common.Episode, sort int, sectionStyle string, numberInTitle bool) *SectionItem {
 	ginCtx, _ := utils.GinCtx(ctx)
 	languages := user.GetLanguagesFromCtx(ginCtx)
 
@@ -121,10 +114,15 @@ func EpisodeSectionItemFrom(ctx context.Context, s *common.Episode, sort int, se
 		img = episode.ImageURL
 	}
 
+	title := episode.Title
+	if numberInTitle && episode.Number != nil {
+		title = fmt.Sprintf("%d. %s", *episode.Number, title)
+	}
+
 	return &SectionItem{
 		ID:          episode.ID,
 		Item:        episode,
-		Title:       episode.Title,
+		Title:       title,
 		Description: episode.Description,
 		Image:       img,
 		Sort:        sort,

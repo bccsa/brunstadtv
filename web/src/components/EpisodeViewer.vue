@@ -6,20 +6,24 @@
     ></div>
 </template>
 <script lang="ts" setup>
-import { addError } from "@/utils/error"
 import { onMounted, onUnmounted, onUpdated, ref } from "vue"
-import { Player, setNPAWOptions } from "bccm-video-player"
+import { Player } from "bccm-video-player"
 import playerFactory from "@/services/player"
 import {
     EpisodeContext,
     useGetMeQuery,
     useUpdateEpisodeProgressMutation,
+    StreamFragment,
+    StreamType,
 } from "@/graph/generated"
 import { useAuth0 } from "@auth0/auth0-vue"
 import { setProgress } from "@/utils/episodes"
 import { current as currentLanguage } from "@/services/language"
 import { getSessionId } from "rudder-sdk-js"
 import { analytics } from "@/services/analytics"
+import { useRoute } from "vue-router"
+import { createVjsMenuButton, type MenuItem } from "@/components/videojs/Menu"
+import { languages } from "@/services/language"
 
 const { isAuthenticated } = useAuth0()
 
@@ -43,12 +47,15 @@ const lanTo3letter: {
     da: "dan",
 }
 
+const route = useRoute()
+
 const { data, executeQuery } = useGetMeQuery()
 
 const props = defineProps<{
     context: EpisodeContext
     episode: {
         id: string
+        uuid: string
         title: string
         duration: number
         progress?: number | null
@@ -60,8 +67,13 @@ const props = defineProps<{
                 title: string
             }
         } | null
+        streams: StreamFragment[]
     }
     autoPlay?: boolean
+}>()
+
+const emit = defineEmits<{
+    (e: "next"): void
 }>()
 
 const player = ref(null as Player | null)
@@ -103,7 +115,7 @@ const onSpaceBar = (event: KeyboardEvent) => {
 }
 
 const load = async () => {
-    const episodeId = props.episode.id
+    const episodeId = props.episode.uuid
     if (current.value !== episodeId) {
         loaded.value = false
         current.value = episodeId
@@ -128,7 +140,7 @@ const load = async () => {
                     sessionId: getSessionId()?.toString() ?? undefined,
                     ageGroup: analytics.getUser()?.ageGroup,
                     metadata: {
-                        contentId: episodeId,
+                        contentId: props.episode.id,
                         title: props.episode.title,
                         episodeTitle: props.episode.title,
                         seasonTitle: props.episode.season?.title,
@@ -141,10 +153,16 @@ const load = async () => {
         }
 
         player.value?.dispose()
-        player.value = await playerFactory.create("video-player", {
+        player.value = await playerFactory.value.create("video-player", {
             episodeId: episodeId,
+            videoLanguage: route.query.videoLang as string | undefined,
             overrides: options,
         })
+
+        if (player.value == null) {
+            return
+        }
+        setupVideoLanguageMenu(player.value)
 
         // create a event when player is created
         const vodPlayer = new CustomEvent("vodPlayer", {
@@ -156,7 +174,11 @@ const load = async () => {
         window.dispatchEvent(vodPlayer)
 
         lastProgress = props.episode.progress
-        player.value.currentTime(lastProgress)
+        const queryTime = parseInt(route.query.t as string, 10)
+        const seekTo = queryTime ?? lastProgress
+        if (seekTo && !isNaN(seekTo)) {
+            player.value.currentTime(seekTo)
+        }
 
         // player.value.on("play", analytics.track("playback_started", ))
         // player.value.on("ended", analytics.track("playback_ended", undefined))
@@ -165,11 +187,50 @@ const load = async () => {
         if (isAuthenticated.value) {
             player.value.on("timeupdate", checkProgress)
         }
-        if (player.value === null) {
-            addError("No available VOD for this episode")
-        }
+        player.value.on("ended", () => {
+            emit("next")
+        })
         loaded.value = true
     }
+}
+
+const setupVideoLanguageMenu = (player: Player) => {
+    const videoLanguages = props.episode.streams
+        .filter((s) => s.type === StreamType.HlsCmaf)
+        .map((s) => {
+            if (s.videoLanguage === null) {
+                return {
+                    label: "Original",
+                    value: null,
+                    selected: route.query.videoLang == null,
+                }
+            }
+            return {
+                label: languages.value.filter(
+                    (l) => l.code === s.videoLanguage
+                )[0].localizedName,
+                value: s.videoLanguage,
+                selected: route.query.videoLang === s.videoLanguage,
+            } as MenuItem
+        })
+
+    function setVideoLanguage(lang: string | undefined) {
+        console.log("Setting video language to", lang)
+        let url = `?t=${player.currentTime()}`
+        if (lang) {
+            url += `&videoLang=${lang}`
+        }
+        window.location.href = url
+    }
+
+    createVjsMenuButton(player, {
+        items: videoLanguages,
+        icon: "vjs-icon-subtitles",
+        title: "Video Language",
+        id: "videolanguage",
+        placement: 10,
+        onClick: (i) => setVideoLanguage(i.value),
+    })
 }
 
 const checkProgress = async (force?: boolean) => {
@@ -210,3 +271,4 @@ onUnmounted(async () => {
     window.removeEventListener("keydown", onSpaceBar)
 })
 </script>
+@/components/videojs/Menu

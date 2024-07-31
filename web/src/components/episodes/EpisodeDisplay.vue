@@ -1,51 +1,55 @@
 <template>
-    <section
-        class="max-w-screen-2xl mx-auto rounded rounded-2xl"
-        v-if="episode"
-    >
+    <section class="max-w-screen-2xl mx-auto rounded-2xl" v-if="episode">
         <div class="relative aspect-video w-full">
             <div
-                class="h-full w-full bg-secondary rounded rounded-xl opacity-10 absolute"
+                class="h-full w-full bg-secondary rounded-xl opacity-10 absolute"
             ></div>
             <EpisodeViewer
                 :context="context"
-                :auto-play="autoPlay"
+                :auto-play="true"
                 class="drop-shadow-xl overflow-hidden"
                 :episode="episode"
+                @next="loadNext"
             ></EpisodeViewer>
         </div>
         <div class="flex flex-col">
             <div class="bg-primary-light p-4 w-full">
                 <div class="flex">
-                    <h1 class="text-lg lg:text-xl font-medium">
+                    <h1
+                        class="text-style-title-2 lg:text-style-headline-2 text-customWhite"
+                    >
                         {{ episode.title }}
                     </h1>
                     <div class="ml-auto">
                         <SharePopover :episode="episode"></SharePopover>
                     </div>
                 </div>
-                <div class="flex">
+                <div class="flex pt-2">
                     <h1 class="my-auto flex gap-1">
                         <AgeRating
                             :episode="episode"
                             :show-a="true"
-                            class="mr-1"
+                            class="mr-1 text-style-caption-2 lg:text-style-caption-1 mt-0.5"
                         />
-                        <span v-if="episode.season" class="text-primary">{{
-                            episode.season.show.title
-                        }}</span>
+                        <span
+                            v-if="episode.season"
+                            class="text-primary text-style-caption-1 lg:text-style-body-2"
+                            >{{ episode.season.show.title }}</span
+                        >
                         <span
                             v-if="episode.productionDateInTitle"
-                            class="text-gray ml-1"
+                            class="text-label-4 text-style-caption-2 lg:text-style-caption-1 ml-1 mt-0.5"
                             >{{
                                 new Date(episode.productionDate).toDateString()
                             }}</span
                         >
                     </h1>
                 </div>
-                <div class="text-white mt-2 opacity-70 text-md lg:text-lg">
-                    {{ episode.description }}
-                </div>
+                <div
+                    class="text-label-3 mt-4 text-style-body-2 lg:text-style-body-2 [&_a]:text-tint-1 [&_a]:underline"
+                    v-html="mdToHTML(episode.description)"
+                ></div>
+                <!-- class="text-white mt-2 opacity-70 text-md lg:text-lg" -->
                 <LessonButton
                     v-if="lesson && !episodeComingSoon(episode)"
                     class="mt-4"
@@ -55,12 +59,12 @@
                 />
             </div>
             <div class="flex flex-col gap-2 mt-4">
-                <div class="flex gap-4 p-2 font-semibold">
+                <div class="flex gap-4 p-2 font-semibold text-style-button-2">
                     <button
                         v-if="
                             episode.context?.__typename === 'ContextCollection'
                         "
-                        class="bg-primary-light uppercase border-gray border px-3 py-1 rounded-full transition duration-100"
+                        class="bg-primary-light uppercase border-separator-on-light border px-3 py-1 rounded-full transition duration-100"
                         :class="[
                             effectiveView === 'context'
                                 ? 'opacity-100 border-opacity-40 '
@@ -72,7 +76,7 @@
                     </button>
                     <button
                         v-else-if="seasonId"
-                        class="bg-primary-light uppercase border-gray border px-3 py-1 rounded-full transition duration-100"
+                        class="bg-primary-light uppercase border-separator-on-light border px-3 py-1 rounded-full transition duration-100"
                         :class="[
                             effectiveView === 'episodes'
                                 ? 'opacity-100 border-opacity-40 '
@@ -93,14 +97,26 @@
                     >
                         {{ $t("episode.details") }}
                     </button>
+                    <button
+                        v-if="episode.files.length > 0"
+                        class="bg-primary-light uppercase border-gray border px-3 py-1 rounded-full transition duration-100"
+                        :class="[
+                            effectiveView === 'download'
+                                ? 'opacity-100 border-opacity-40'
+                                : 'opacity-50 bg-opacity-0 border-opacity-0',
+                        ]"
+                        @click="effectiveView = 'download'"
+                    >
+                        {{ $t("buttons.download") }}
+                    </button>
                 </div>
-                <hr class="border-gray border-opacity-70" />
+                <hr class="border-separator-on-light" />
                 <div>
                     <Transition name="slide-fade" mode="out-in">
                         <EpisodeDetails
                             v-if="effectiveView === 'details'"
                             :episode="episode"
-                        ></EpisodeDetails>
+                        />
                         <div v-else-if="effectiveView === 'context'">
                             <ItemList
                                 :items="
@@ -129,6 +145,9 @@
                                 :current-id="episode.id"
                                 @item-click="(i) => setEpisode(uuid ? (i as any).uuid : i.id)"
                             ></ItemList>
+                        </div>
+                        <div v-else-if="effectiveView === 'download'">
+                            <EmbedDownloadables :episode="episode" />
                         </div>
                     </Transition>
                 </div>
@@ -161,6 +180,8 @@ import SharePopover from "./SharePopover.vue"
 import LessonButton from "../study/LessonButton.vue"
 import router from "@/router"
 import { episodeComingSoon } from "../../utils/items"
+import EmbedDownloadables from "../embed/EmbedDownloadables.vue"
+import { mdToHTML } from "@/services/converter"
 
 const props = defineProps<{
     initialEpisodeId: string
@@ -246,7 +267,7 @@ const load = async () => {
     if (r.data.value?.episode) {
         episode.value = r.data.value.episode
 
-        if (!context.value?.collectionId) {
+        if (!context.value?.collectionId && !context.value?.playlistId) {
             if (episode.value.season?.id) {
                 seasonId.value = episode.value.season.id
                 await nextTick()
@@ -258,7 +279,7 @@ const load = async () => {
 }
 
 load()
-const view = ref(null as "episodes" | "details" | "context" | null)
+const view = ref(null as "episodes" | "details" | "context" | "download" | null)
 
 const effectiveView = computed({
     get() {
@@ -277,7 +298,8 @@ const effectiveView = computed({
                 }
                 break
             case "details":
-                return "details"
+            case "download":
+                return v
         }
 
         if (episode.value?.context?.__typename === "ContextCollection") {
@@ -289,4 +311,13 @@ const effectiveView = computed({
         view.value = v
     },
 })
+
+const loadNext = async () => {
+    const nextId = episode.value?.next[0]?.id
+    if (nextId) {
+        episodeId.value = nextId
+        await nextTick()
+        await load()
+    }
+}
 </script>

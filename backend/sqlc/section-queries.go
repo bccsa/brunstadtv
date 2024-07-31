@@ -3,10 +3,10 @@ package sqlc
 import (
 	"context"
 	"encoding/json"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
 	"time"
 
-	"github.com/bcc-code/brunstadtv/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v4"
 )
@@ -129,7 +129,6 @@ func (q *Queries) GetPermissionsForSections(ctx context.Context, ids []int) ([]c
 	return lo.Map(rows, func(i getPermissionsForSectionsRow, _ int) common.Permissions[int] {
 		return common.Permissions[int]{
 			ItemID: int(i.ID),
-			Type:   common.TypeSection,
 			Availability: common.Availability{
 				Published: true,
 				From:      from,

@@ -5,6 +5,7 @@
         "logout": "Sair",
         "stayLoggedOut": "Permanecer desconectado ",
         "cancel": "Cancelar",
+        "accept": "Aceitar ",
         "submit": "Enviar",
         "back": "Voltar",
         "next": "Próximo",
@@ -15,7 +16,13 @@
         "send": "Enviar",
         "start": "Começar",
         "skip": "Pular",
-        "join": "Partícipe"
+        "join": "Partícipe",
+        "open": "Abrir"
+    },
+    "download": {
+        "resolution": "Resolução",
+        "language": "Idiomas",
+        "progress": "Progresso"
     },
     "error": {
         "couldntSendYourMessage": "Não foi possível enviar sua mensagem",
@@ -72,7 +79,9 @@
         }
     },
     "live": {
-        "now": "Agora"
+        "now": "Agora",
+        "title": "Novo aplicativo de transmissão ao vivo",
+        "description": ""
     },
     "calendar": {
         "noScheduledEvents": "Nenhum evento agendado",
@@ -92,6 +101,7 @@
         "title": "Título ",
         "subject": "Tema ",
         "content": "Conteúdo ",
+        "faq": "Perguntas frequentes",
         "describeIssue": "Descreva o problema em detalhe "
     },
     "study": {
@@ -140,7 +150,11 @@
         "information": "BCC Media é uma fundação de mídia na [federação BCC](https://bcc.no) que produz e distribui conteúdo com valores positivos e cristãos.\n\nA BCC Media é uma emissora registrada e adere aos regulamentos estabelecidos na Lei Norueguesa de Radiodifusão. O órgão de supervisão desta lei é [a Autoridade Norueguesa de Mídia](https://medietilsynet.no/).",
         "headOffice": "Sede",
         "contactUs": "Entre em contato ",
-        "downloadApp": "Baixe nosso aplicativo "
+        "downloadApp": "Baixe nosso aplicativo ",
+        "termsOfUse": "Termos de uso"
+    },
+    "terms": {
+        "byDownloadingYouAcceptTerms": ""
     },
     "share": {
         "title": "Compartilhar",
@@ -159,5 +173,33 @@
     "thankYou": "Obrigada!",
     "yourResponseHasBeenSubmitted": "Sua resposta foi enviada ",
     "sending": "Enviado",
-    "defaultInputPlaceholder": "Começar a escrever aqui..."
+    "defaultInputPlaceholder": "Começar a escrever aqui...",
+    "requests": {
+        "name": "Seu nome",
+        "email": "Email",
+        "role": "Seu papel",
+        "what": "Material a ser solicitado",
+        "how": "Como se utilizará o material?",
+        "howDescription": "Mostrado parcialmente/totalmente, editado...",
+        "where": "Onde se utilizará o material?",
+        "when": "Quando se utilizará o material?",
+        "clear": "Limpar",
+        "send": "Enviar",
+        "editor": "Editor",
+        "director": "Diretor",
+        "producer": "Produtor",
+        "eventCamp": "Evento/acampamento",
+        "local": "Reunião local",
+        "mediaResponsible": "Responsáveis dos meios de comunicação",
+        "other": "Outros",
+        "confirmSend": "Enviar solicitação de material?",
+        "title": "Solicitação de materiais",
+        "description": "Formulário para solicitação de materiais de áudio, imagem e vídeo de BCC Media",
+        "receitTitle": "Pedido recebido",
+        "confirmAgenda": "Confirmo que o material será utilizado apenas para a finalidade acordada.",
+        "receitDescription": "Nossa equipe entrará em contato com você em até 7 dias úteis. Uma resposta automática foi enviada para seu e-mail."
+    },
+    "shorts": {
+        "watchOnOurApp": ""
+    }
 }

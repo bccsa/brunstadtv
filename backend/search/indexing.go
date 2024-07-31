@@ -2,13 +2,14 @@ package search
 
 import (
 	"context"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
+	"github.com/google/uuid"
 	"strconv"
 	"strings"
 
 	"github.com/algolia/algoliasearch-client-go/v3/algolia/opt"
 	"github.com/algolia/algoliasearch-client-go/v3/algolia/search"
-	"github.com/bcc-code/brunstadtv/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
 	"github.com/bcc-code/mediabank-bridge/log"
 	"github.com/samber/lo"
 )
@@ -33,6 +34,8 @@ func (service *Service) Reindex(ctx context.Context) error {
 	service.loaders.SeasonPermissionLoader.ClearAll()
 	service.loaders.EpisodeLoader.ClearAll()
 	service.loaders.EpisodePermissionLoader.ClearAll()
+	service.loaders.PlaylistLoader.ClearAll()
+	service.loaders.PlaylistPermissionLoader.ClearAll()
 
 	// Makes it possible to filter in query, which fields you are searching on
 	// Also configures hits per page
@@ -89,6 +92,11 @@ func (service *Service) Reindex(ctx context.Context) error {
 	}
 	log.L.Debug().Str("collection", "episodes").Msg("Indexing")
 	err = service.indexEpisodes(ctx, index)
+	if err != nil {
+		return err
+	}
+	log.L.Debug().Str("collection", "episodes").Msg("Indexing")
+	err = service.indexPlaylists(ctx, index)
 	if err != nil {
 		return err
 	}
@@ -169,6 +177,17 @@ func (service *Service) indexEpisode(ctx context.Context, id int) error {
 	return indexObject[int, common.Episode](ctx, service, *i, p, service.episodeToSearchItem)
 }
 
+func (service *Service) indexPlaylists(ctx context.Context, index *search.Index) error {
+	return indexCollection[uuid.UUID, common.Playlist](
+		ctx,
+		index,
+		service.loaders.PlaylistLoader,
+		service.loaders.PlaylistPermissionLoader,
+		service.queries.ListPlaylists,
+		service.playlistToSearchItem,
+	)
+}
+
 type indexable[k comparable] interface {
 	GetKey() k
 }
@@ -218,8 +237,10 @@ func indexCollection[k comparable, t indexable[k]](
 			return err
 		}
 
-		item.assignVisibility(perm.Availability)
-		item.assignRoles(perm.Roles)
+		if perm != nil {
+			item.assignVisibility(perm.Availability)
+			item.assignRoles(perm.Roles)
+		}
 
 		searchItems = append(searchItems, item.toSearchObject())
 		err = pushItems(false)

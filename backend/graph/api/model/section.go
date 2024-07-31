@@ -2,9 +2,9 @@ package model
 
 import (
 	"context"
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/user"
-	"github.com/bcc-code/brunstadtv/backend/utils"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/user"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 	"strconv"
 )
 
@@ -206,6 +206,20 @@ func SectionFrom(ctx context.Context, s *common.Section) Section {
 		Title:       title,
 		Description: description,
 		Size:        SectionSizeMedium,
+	}
+}
+
+// LinkFrom returns link from common.Link
+func LinkFrom(ctx context.Context, s *common.Link) *Link {
+	ginCtx, _ := utils.GinCtx(ctx)
+	languages := user.GetLanguagesFromCtx(ginCtx)
+
+	return &Link{
+		ID:          strconv.Itoa(s.ID),
+		URL:         s.URL,
+		Title:       s.Title.Get(languages),
+		Description: s.Description.GetValueOrNil(languages),
+		Type:        LinkType(s.Type),
 	}
 }
 

@@ -8,7 +8,8 @@ import {
 import { AuthConfig, authExchange, AuthUtilities } from "@urql/exchange-auth"
 import { Auth } from "../services/auth"
 import { current } from "@/services/language"
-import { flutter } from "@/utils/flutter"
+import { current as currentApp } from "@/services/app"
+import { webViewMain } from "@/services/webviews/mainHandler"
 
 const authExchangeFunction = async (
     utils: AuthUtilities
@@ -28,8 +29,8 @@ const authExchangeFunction = async (
             return false
         },
         async refreshAuth() {
-            token = flutter
-                ? await flutter.getAccessToken()
+            token = webViewMain
+                ? await webViewMain.getAccessToken()
                 : await Auth.getToken()
         },
     }
@@ -44,6 +45,7 @@ export default createClient({
             Object.assign(init ?? {}, {
                 headers: Object.assign(init?.headers ?? {}, {
                     "Accept-Language": current.value.code,
+                    "X-Application": currentApp.value,
                 }),
             })
         )

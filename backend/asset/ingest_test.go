@@ -5,8 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/bcc-code/brunstadtv/backend/asset/smil"
-	"github.com/bcc-code/brunstadtv/backend/directus"
+	"github.com/bcc-code/bcc-media-platform/backend/asset/smil"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,7 +37,7 @@ func TestCalculateDuration(t *testing.T) {
 	}
 
 	for in, out := range testData {
-		a := assetIngestJSONMeta{
+		a := IngestJSONMeta{
 			Duration: in,
 		}
 
@@ -55,60 +54,23 @@ func TestGetLanguagesFromVideoElement(t *testing.T) {
 	assert.NoError(t, err)
 
 	langs := GetLanguagesFromVideoElement(smilObj.Body.Switch.Videos[0])
-	assert.Equal(t, []directus.AssetStreamLanguage{
-		{
-			AssetStreamID: "+",
-			LanguagesCode: directus.LanguagesCode{
-				Code: "it",
-			},
-		},
-		{
-			AssetStreamID: "+",
-			LanguagesCode: directus.LanguagesCode{
-				Code: "de",
-			},
-		},
-		{
-			AssetStreamID: "+",
-			LanguagesCode: directus.LanguagesCode{
-				Code: "fr",
-			},
-		},
-	}, langs)
+	assert.Equal(t, []string{"it", "de", "fr"}, langs)
 
 	langs = GetLanguagesFromVideoElement(smilObj.Body.Switch.Videos[1])
-	assert.Equal(t, []directus.AssetStreamLanguage{
-		{
-			AssetStreamID: "+",
-			LanguagesCode: directus.LanguagesCode{
-				Code: "no",
-			},
-		},
-		{
-			AssetStreamID: "+",
-			LanguagesCode: directus.LanguagesCode{
-				Code: "fi",
-			},
-		},
-		{
-			AssetStreamID: "+",
-			LanguagesCode: directus.LanguagesCode{
-				Code: "sv",
-			},
-		},
-	}, langs)
+
+	assert.Equal(t, []string{"no", "fi", "sv"}, langs)
 
 	langs = GetLanguagesFromVideoElement(smilObj.Body.Switch.Videos[2])
-	assert.Equal(t, []directus.AssetStreamLanguage{}, langs)
+	assert.Equal(t, 0, len(langs))
 
 	langs = GetLanguagesFromVideoElement(smilObj.Body.Switch.Videos[3])
-	assert.Equal(t, []directus.AssetStreamLanguage{}, langs)
+	assert.Equal(t, 0, len(langs))
 }
 
 func TestParseJson(t *testing.T) {
 	bytes, err := os.ReadFile("./testdata/001.json")
 	assert.NoError(t, err)
-	obj := assetIngestJSONMeta{}
+	obj := IngestJSONMeta{}
 	err = json.Unmarshal(bytes, &obj)
 	assert.NoError(t, err)
 }
@@ -116,12 +78,12 @@ func TestParseJson(t *testing.T) {
 func TestParseJson2(t *testing.T) {
 	bytes, err := os.ReadFile("./testdata/002.json")
 	assert.NoError(t, err)
-	obj := assetIngestJSONMeta{}
+	obj := IngestJSONMeta{}
 	err = json.Unmarshal(bytes, &obj)
 	assert.NoError(t, err)
 
 	for _, file := range obj.Files {
 		assert.Equal(t, "1920x1080", file.Resolution)
-		assert.NotEmpty(t, file.AudioLanguge)
+		assert.NotEmpty(t, file.AudioLanguage)
 	}
 }

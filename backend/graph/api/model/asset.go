@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/cloudfront/sign"
-	"github.com/bcc-code/brunstadtv/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
 )
 
 type signatureProvider interface {
@@ -36,7 +36,7 @@ func FileFrom(_ context.Context, signer signatureProvider, cdnDomain string, fil
 		Scheme: "https",
 	}
 
-	policy := sign.NewCannedPolicy(u.String(), time.Now().Add(time.Hour))
+	policy := sign.NewCannedPolicy(u.String(), time.Now().Add(3*time.Hour))
 
 	signed, err := signer.SignWithPolicy(u.String(), policy)
 	if err != nil {
@@ -91,5 +91,6 @@ func StreamFrom(_ context.Context, signer signatureProvider, cdn cdnConfig, stre
 		AudioLanguages:    stream.AudioLanguages,
 		SubtitleLanguages: stream.SubtitleLanguages,
 		Type:              StreamType(stream.Type),
+		Downloadable:      stream.Service == "mediapackage",
 	}, nil
 }

@@ -4,7 +4,10 @@
         <div class="flex gap-4">
             <div v-for="(i, index) in filteredItems">
                 <StudyTopicCardLarge
-                    v-if="item.cardSize == 'large' && i.item.__typename === 'StudyTopic'"
+                    v-if="
+                        item.cardSize == 'large' &&
+                        i.item.__typename === 'StudyTopic'
+                    "
                     :item="i.item"
                     @click="$emit('clickItem', index)"
                     ref="sectionItem"
@@ -16,13 +19,9 @@
 </template>
 <script lang="ts" setup>
 import { Section } from "../types"
-
 import SectionTitle from "./SectionTitle.vue"
-import { computed, onMounted, ref } from "vue"
-import { getImageSize } from "@/utils/images"
-import Image from "@/components/Image.vue"
+import { computed } from "vue"
 import StudyTopicCardLarge from "./cards/StudyTopicCardLarge.vue"
-import { StudyTopicSectionItemFragment } from "@/graph/generated"
 
 const props = defineProps<{
     item: Section & { __typename: "CardSection" }

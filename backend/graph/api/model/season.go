@@ -4,9 +4,9 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/user"
-	"github.com/bcc-code/brunstadtv/backend/utils"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/user"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 )
 
 // SeasonFrom coverts a common.Season into an GQL episode type
@@ -50,20 +50,6 @@ func SeasonFrom(ctx context.Context, s *common.Season) *Season {
 		AgeRating:   s.AgeRating,
 		ImageURL:    image,
 		Images:      images,
-	}
-}
-
-// SeasonItemFrom returns a SeasonItem from a common.Season
-func SeasonItemFrom(ctx context.Context, s *common.Season, sort int) *SeasonItem {
-	season := SeasonFrom(ctx, s)
-
-	return &SeasonItem{
-		ID:       season.ID,
-		Season:   season,
-		Title:    season.Title,
-		Sort:     sort,
-		Images:   season.Images,
-		ImageURL: season.ImageURL,
 	}
 }
 

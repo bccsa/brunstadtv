@@ -8,6 +8,8 @@ import { useAuth0 } from "@/services/auth0"
 const COUNTRY_CODE_CLAIM = "https://login.bcc.no/claims/CountryIso2Code"
 const CHURCH_ID_CLAIM = "https://login.bcc.no/claims/churchId"
 
+const query = new URLSearchParams(window.location.search)
+
 export class Auth {
     private static wasLoggedIn: string | null
     public static shouldSignIn() {
@@ -76,8 +78,8 @@ export class Auth {
     }
 
     public static async getToken() {
-        const { getAccessTokenSilently, isAuthenticated, loginWithRedirect } = useAuth0()
-        // btv_box
+        const { getAccessTokenSilently, isAuthenticated, loginWithRedirect } =
+            useAuth0()
         if (localStorage.getItem("isOnline") == "true")
         if (isAuthenticated.value) {
             try {
@@ -90,7 +92,7 @@ export class Auth {
                 }, 15000)
             }
         }
-        return null
+        return query.get("access_token")
     }
 
     public static isAuthenticated() {

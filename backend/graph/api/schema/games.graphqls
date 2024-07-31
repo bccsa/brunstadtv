@@ -1,5 +1,5 @@
-type Game {
-    id: UUID!
+type Game implements CollectionItem {
+    id: ID!
     title: String!
     description: String
     url: String!

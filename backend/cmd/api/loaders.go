@@ -5,20 +5,21 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
+	"time"
+
 	cache "github.com/Code-Hex/go-generics-cache"
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/items/collection"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
-	"github.com/bcc-code/brunstadtv/backend/members"
-	"github.com/bcc-code/brunstadtv/backend/memorycache"
-	"github.com/bcc-code/brunstadtv/backend/sqlc"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/items/collection"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/members"
+	"github.com/bcc-code/bcc-media-platform/backend/memorycache"
+	"github.com/bcc-code/bcc-media-platform/backend/sqlc"
 	"github.com/bcc-code/mediabank-bridge/log"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"gopkg.in/guregu/null.v4"
-	"sort"
-	"strings"
-	"time"
 )
 
 var roleLoaders = loaders.NewCollection[string, *common.FilteredLoaders](time.Minute)
@@ -64,13 +65,25 @@ func getLoadersForRoles(db *sql.DB, queries *sqlc.Queries, collectionLoader *loa
 		EpisodeStudyLessonsLoader: loaders.NewRelationLoader(ctx, rq.GetLessonIDsForEpisodes, loaders.WithName("episode-study-lessons")),
 		StudyLessonLinksLoader:    loaders.NewRelationLoader(ctx, rq.GetLinkIDsForLessons, loaders.WithName("study-lesson-links")),
 		LinkStudyLessonsLoader:    loaders.NewRelationLoader(ctx, rq.GetLessonIDsForLinks, loaders.WithName("link-study-lessons")),
+		FAQQuestionsLoader:        loaders.NewRelationLoader(ctx, rq.GetQuestionIDsForCategories, loaders.WithName("questions")),
 
 		PromptIDsLoader: func(ctx context.Context) ([]uuid.UUID, error) {
 			return memorycache.GetOrSet(ctx, fmt.Sprintf("promptIDs:roles:%s", key), func(ctx context.Context) ([]uuid.UUID, error) {
 				return queries.GetPromptIDsForRoles(ctx, roles)
 			}, cache.WithExpiration(time.Minute*5))
 		},
+		FAQCategoryIDsLoader: func(ctx context.Context) ([]uuid.UUID, error) {
+			return memorycache.GetOrSet(ctx, fmt.Sprintf("categoryIDs:roles:%s", key), func(ctx context.Context) ([]uuid.UUID, error) {
+				return queries.ListFAQCategoryIDsForRoles(ctx, roles)
+			}, cache.WithExpiration(time.Minute*5))
+		},
 		SurveyQuestionsLoader: loaders.NewRelationLoader(ctx, rq.GetSurveyQuestionIDsForSurveyIDs, loaders.WithName("survey-questions-loader")),
+
+		ShortIDsLoader: func(ctx context.Context) ([]uuid.UUID, error) {
+			return memorycache.GetOrSet(ctx, fmt.Sprintf("shortIDs:roles:%s", key), func(ctx context.Context) ([]uuid.UUID, error) {
+				return queries.ListShortIDsForRoles(ctx, roles)
+			}, cache.WithExpiration(time.Minute*5))
+		},
 	}
 
 	// Canceling the context on delete stops janitors nested inside the loaders as well.
@@ -145,12 +158,25 @@ func initBatchLoaders(queries *sqlc.Queries, membersClient *members.Client) *com
 		EpisodeIDFromLegacyIDLoader:        loaders.NewConversionLoader(ctx, queries.GetEpisodeIDsForLegacyIDs, loaders.WithName("episode-legacyid")),
 		LinkLoader:                         loaders.New(ctx, queries.GetLinks),
 		EventLoader:                        loaders.New(ctx, queries.GetEvents),
+		EventEntriesLoader:                 loaders.NewRelationLoader(ctx, queries.GetEntryIDsForEventIDs, loaders.WithName("event-entries")),
+		PlaylistLoader: loaders.New(ctx, queries.GetPlaylists, loaders.WithName("playlist-loader"), loaders.WithKeyFunc(func(i common.Playlist) uuid.UUID {
+			return i.ID
+		})),
+
 		FilesLoader: loaders.NewListLoader(ctx, queries.GetFilesForEpisodes, func(row common.File) int {
 			return row.EpisodeID
 		}),
 		StreamsLoader: loaders.NewListLoader(ctx, queries.GetStreamsForEpisodes, func(row common.Stream) int {
 			return row.EpisodeID
 		}),
+
+		AssetFilesLoader: loaders.NewListLoader(ctx, queries.GetFilesForAssets, func(row common.File) int {
+			return row.AssetID
+		}),
+		AssetStreamsLoader: loaders.NewListLoader(ctx, queries.GetStreamsForAssets, func(row common.Stream) int {
+			return row.AssetID
+		}),
+
 		CollectionLoader: loaders.New(ctx, queries.GetCollections),
 		CollectionItemLoader: loaders.NewListLoader(ctx, queries.GetItemsForCollections, func(row common.CollectionItem) int {
 			return row.CollectionID
@@ -162,19 +188,19 @@ func initBatchLoaders(queries *sqlc.Queries, membersClient *members.Client) *com
 		// Permissions
 		ShowPermissionLoader: loaders.NewCustomLoader(ctx, queries.GetPermissionsForShows, func(i common.Permissions[int]) int {
 			return i.ItemID
-		}, loaders.WithName("show-permission")),
+		}, loaders.WithName("show-permission"), loaders.WithMemoryCache(time.Second*15)),
 		SeasonPermissionLoader: loaders.NewCustomLoader(ctx, queries.GetPermissionsForSeasons, func(i common.Permissions[int]) int {
 			return i.ItemID
-		}, loaders.WithName("season-permission")),
+		}, loaders.WithName("season-permission"), loaders.WithMemoryCache(time.Second*15)),
 		EpisodePermissionLoader: loaders.NewCustomLoader(ctx, queries.GetPermissionsForEpisodes, func(i common.Permissions[int]) int {
 			return i.ItemID
-		}, loaders.WithName("episode-permission")),
+		}, loaders.WithName("episode-permission"), loaders.WithMemoryCache(time.Second*15)),
 		PagePermissionLoader: loaders.NewCustomLoader(ctx, queries.GetPermissionsForPages, func(i common.Permissions[int]) int {
 			return i.ItemID
-		}, loaders.WithName("page-permission")),
+		}, loaders.WithName("page-permission"), loaders.WithMemoryCache(time.Second*15)),
 		SectionPermissionLoader: loaders.NewCustomLoader(ctx, queries.GetPermissionsForSections, func(i common.Permissions[int]) int {
 			return i.ItemID
-		}, loaders.WithName("section-permission")),
+		}, loaders.WithName("section-permission"), loaders.WithMemoryCache(time.Second*15)),
 
 		MemberLoader: loaders.New(ctx, membersClient.GetMembersByIDs, loaders.WithKeyFunc(func(i members.Member) int {
 			return i.PersonID
@@ -196,14 +222,30 @@ func initBatchLoaders(queries *sqlc.Queries, membersClient *members.Client) *com
 			return i.ID
 		})),
 
+		PersonLoader: loaders.New(ctx, queries.GetPersons, loaders.WithName("person-loader"), loaders.WithKeyFunc(func(i common.Person) uuid.UUID {
+			return i.ID
+		})),
+		SongLoader: loaders.New(ctx, queries.GetSongs, loaders.WithName("song-loader"), loaders.WithKeyFunc(func(i common.Song) uuid.UUID {
+			return i.ID
+		})),
+		TimedMetadataLoader: loaders.New(ctx, queries.GetTimedMetadata, loaders.WithName("timedmetadata-loader"), loaders.WithKeyFunc(func(i common.TimedMetadata) uuid.UUID {
+			return i.ID
+		})),
+		PhraseLoader: loaders.New(ctx, queries.GetPhrases, loaders.WithName("phrases-loader"), loaders.WithKeyFunc(func(i common.Phrase) string {
+			return i.Key
+		})),
+
 		FAQCategoryLoader:  loaders.NewLoader(ctx, queries.GetFAQCategories),
 		QuestionLoader:     loaders.NewLoader(ctx, queries.GetQuestions),
-		QuestionsLoader:    loaders.NewRelationLoader(ctx, queries.GetQuestionIDsForCategories, loaders.WithName("questions")),
 		MessageGroupLoader: loaders.NewLoader(ctx, queries.GetMessageGroups),
 
 		GameLoader: loaders.New(ctx, queries.GetGames, loaders.WithKeyFunc(func(i common.Game) uuid.UUID {
 			return i.ID
 		})),
+		ShortLoader: loaders.New(ctx, queries.GetShorts, loaders.WithKeyFunc(func(i common.Short) uuid.UUID {
+			return i.ID
+		})),
+		ShortsMediaIDLoader: loaders.NewConversionLoader(ctx, queries.GetMediaIDsForShortIDs, loaders.WithName("shorts-media-id")),
 
 		// User Data
 		StudyTopicLoader:  loaders.New(ctx, queries.GetTopics),

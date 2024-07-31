@@ -2,10 +2,10 @@ package graph
 
 import (
 	"context"
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/graph/api/model"
-	"github.com/bcc-code/brunstadtv/backend/ratelimit"
-	"github.com/bcc-code/brunstadtv/backend/utils"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/graph/api/model"
+	"github.com/bcc-code/bcc-media-platform/backend/ratelimit"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 	"strconv"
 )
 
@@ -16,8 +16,10 @@ func gqlShowFromSearchResultItem(i common.SearchResultItem) model.ShowSearchItem
 		legacyID = &str
 	}
 
+	id := strconv.Itoa(i.ID)
+
 	return model.ShowSearchItem{
-		ID:          strconv.Itoa(i.ID),
+		ID:          id,
 		LegacyID:    legacyID,
 		Collection:  i.Collection,
 		Title:       i.Title,

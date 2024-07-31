@@ -5,7 +5,8 @@ import (
 	"cloud.google.com/go/cloudtasks/apiv2/cloudtaskspb"
 	"context"
 	"encoding/json"
-	"github.com/bcc-code/brunstadtv/backend/utils"
+	"errors"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 	"github.com/bcc-code/mediabank-bridge/log"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/api/iterator"
@@ -51,7 +52,7 @@ func (s *Service) Queue(ctx context.Context, collection string, id string, at ti
 
 	for {
 		resp, err := it.Next()
-		if err == iterator.Done {
+		if errors.Is(err, iterator.Done) {
 			break
 		}
 		if err != nil {

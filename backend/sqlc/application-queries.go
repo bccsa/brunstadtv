@@ -2,8 +2,8 @@ package sqlc
 
 import (
 	"context"
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/loaders"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/loaders"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 )
@@ -11,13 +11,13 @@ import (
 // ApplicationQueries contains queries specific to application
 type ApplicationQueries struct {
 	*Queries
-	groupID uuid.UUID
+	GroupID uuid.UUID
 }
 
 // ApplicationQueries returns application-queries
 func (q *Queries) ApplicationQueries(groupID uuid.UUID) *ApplicationQueries {
 	return &ApplicationQueries{
-		groupID: groupID,
+		GroupID: groupID,
 		Queries: q,
 	}
 }
@@ -36,6 +36,7 @@ func mapToApplications(applications []getApplicationsRow) []common.Application {
 			SearchPageID:        p.SearchPageID,
 			GamesPageID:         p.GamesPageID,
 			RelatedCollectionID: p.StandaloneRelatedCollectionID,
+			SupportEmail:        p.SupportEmail,
 			Roles:               p.Roles,
 		}
 	})

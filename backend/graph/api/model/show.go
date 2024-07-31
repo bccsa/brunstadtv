@@ -4,9 +4,9 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/bcc-code/brunstadtv/backend/common"
-	"github.com/bcc-code/brunstadtv/backend/user"
-	"github.com/bcc-code/brunstadtv/backend/utils"
+	"github.com/bcc-code/bcc-media-platform/backend/common"
+	"github.com/bcc-code/bcc-media-platform/backend/user"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 )
 
 // ShowFrom coverts a common.Show into an GQL episode type
@@ -45,20 +45,6 @@ func ShowFrom(ctx context.Context, s *common.Show) *Show {
 		Description: s.Description.Get(languages),
 		ImageURL:    image,
 		Images:      images,
-	}
-}
-
-// ShowItemFrom returns a ShowItem from a sql row
-func ShowItemFrom(ctx context.Context, s *common.Show, sort int) *ShowItem {
-	show := ShowFrom(ctx, s)
-
-	return &ShowItem{
-		ID:       show.ID,
-		Show:     show,
-		Title:    show.Title,
-		ImageURL: show.ImageURL,
-		Images:   show.Images,
-		Sort:     sort,
 	}
 }
 
