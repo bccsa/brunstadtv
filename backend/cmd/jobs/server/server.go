@@ -46,7 +46,6 @@ var (
 )
 
 // NewServer returns a new Server for handling the HTTP requests
-// Yes, go, I know it's "annoying to work with" but in this case you will have to deal with it
 func NewServer(s ExternalServices, c ConfigData) *Server {
 	return &Server{
 		services: s,
@@ -128,6 +127,16 @@ func (s Server) ProcessMessage(c *gin.Context) {
 	switch e.Type() {
 	case events.TypeAssetDelivered:
 		err = asset.Ingest(ctx, s.services, s.config, e)
+	case events.TypeAssetTimedMetadataDelivered:
+		msg := events.AssetTimedMetadataDelivered{}
+		err = e.DataAs(&msg)
+		if err != nil {
+			break
+		}
+		err = asset.IngestTimedMetadata(ctx, s.services, s.config, asset.IngestTimedMetadataParams{
+			VXID:     msg.VXID,
+			JSONPath: msg.JSONPath,
+		})
 	case events.TypeRefreshView:
 		err = maintenance.RefreshView(ctx, s.services, e)
 	case events.TypeDirectusEvent:
@@ -149,7 +158,8 @@ func (s Server) ProcessMessage(c *gin.Context) {
 			Err(err).
 			Str("msg", spew.Sdump(msg)).
 			Msgf("Error processing message. See log for more details")
-		c.Status(http.StatusOK)
+		span.SetStatus(codes.Error, err.Error())
+		c.JSON(http.StatusOK, map[string]string{"error": err.Error()})
 		return
 	}
 }

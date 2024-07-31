@@ -1,6 +1,6 @@
 <template>
     <section>
-        <div class="w-full lg:w-1/2">
+        <div class="w-full">
             <div
                 v-for="i in items.filter((i) => i.type === 'Episode')"
                 class="flex p-2 gap-2 cursor-pointer border-l-4 border-red hover:bg-red hover:bg-opacity-10 hover:border-opacity-100 transition duration-200"
@@ -13,7 +13,7 @@
                 @click="$emit('itemClick', i)"
                 :key="i.id"
             >
-                <div class="w-1/3">
+                <div class="w-1/3 lg:w-1/5">
                     <WithProgressBar
                         class="aspect-video text-xs"
                         :item="
@@ -42,7 +42,7 @@
                     </WithProgressBar>
                 </div>
                 <div
-                    class="w-2/3 ml-4"
+                    class="w-2/3 ml-4 mt-2"
                     :class="episodeComingSoon(i) ? 'opacity-50' : ''"
                 >
                     <h1 class="text-style-title-3 line-clamp-2">
@@ -52,9 +52,14 @@
                     </h1>
                     <AgeRating :episode="i" />
                     <div
-                        class="hidden lg:flex mt-1.5 line-clamp-2 text-style-body-2 opacity-70"
+                        class="hidden lg:flex mt-1.5 text-style-body-2 opacity-70"
                     >
-                        {{ i.description }}
+                        <div
+                            class="pointer-events-none line-clamp-2 lg:line-clamp-3"
+                            v-html="
+                                i.description ? mdToHTML(i.description) : ''
+                            "
+                        ></div>
                     </div>
                 </div>
             </div>
@@ -68,6 +73,7 @@ import AgeRating from "../episodes/AgeRating.vue"
 import { ListItem } from "@/utils/lists"
 import Pill from "./item/Pill.vue"
 import { comingSoon, episodeComingSoon } from "@/utils/items"
+import { mdToHTML } from "@/services/converter"
 
 defineProps<{
     items: ListItem[]

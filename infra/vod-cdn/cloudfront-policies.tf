@@ -30,13 +30,13 @@ resource "aws_cloudfront_origin_request_policy" "manifest_lambda" {
     cookie_behavior = "none"
   }
   headers_config {
-    header_behavior = "none"
+    header_behavior = "allViewer"
   }
 
   query_strings_config {
     query_string_behavior = "whitelist"
     query_strings {
-      items = ["EncodedPolicy", "m"]
+      items = ["EncodedPolicy", "m", "aws.manifestfilter"]
     }
   }
 

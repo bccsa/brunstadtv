@@ -77,8 +77,8 @@ func mapToCalendarEntries(items []getCalendarEntriesRow) []common.CalendarEntry 
 		var title common.LocaleString
 		var description common.LocaleString
 
-		_ = json.Unmarshal(i.Title.RawMessage, &title)
-		_ = json.Unmarshal(i.Description.RawMessage, &description)
+		_ = json.Unmarshal(i.Title, &title)
+		_ = json.Unmarshal(i.Description, &description)
 
 		var itemID null.Int
 		switch i.LinkType.ValueOrZero() {
@@ -116,17 +116,6 @@ func (rq *RoleQueries) GetCalendarEntries(ctx context.Context, ids []int) ([]com
 	return mapToCalendarEntries(items), nil
 }
 
-// ListCalendarEntries returns all entries
-func (rq *RoleQueries) ListCalendarEntries(ctx context.Context) ([]common.CalendarEntry, error) {
-	items, err := rq.queries.listCalendarEntries(ctx, rq.roles)
-	if err != nil {
-		return nil, err
-	}
-	return mapToCalendarEntries(lo.Map(items, func(i listCalendarEntriesRow, _ int) getCalendarEntriesRow {
-		return getCalendarEntriesRow(i)
-	})), nil
-}
-
 // GetCalendarEntriesForPeriod returns events for the specific period
 func (q *Queries) GetCalendarEntriesForPeriod(ctx context.Context, from time.Time, to time.Time) ([]int, error) {
 	ids, err := q.getCalendarEntryIDsForPeriod(ctx, getCalendarEntryIDsForPeriodParams{
@@ -137,4 +126,16 @@ func (q *Queries) GetCalendarEntriesForPeriod(ctx context.Context, from time.Tim
 		return nil, err
 	}
 	return int32ToInt(ids), err
+}
+
+// GetCalendarEntriesByID returns the calendar entries for the specified ids
+func (q *Queries) GetCalendarEntriesByID(ctx context.Context, ids []int) ([]common.CalendarEntry, error) {
+	items, err := q.getCalendarEntriesByID(ctx, intToInt32(ids))
+	if err != nil {
+		return nil, err
+	}
+
+	return mapToCalendarEntries(lo.Map(items, func(i getCalendarEntriesByIDRow, _ int) getCalendarEntriesRow {
+		return getCalendarEntriesRow(i)
+	})), nil
 }

@@ -1,14 +1,9 @@
 import config from "@/config"
-import {
-    cacheExchange,
-    createClient,
-    dedupExchange,
-    fetchExchange,
-} from "@urql/vue"
+import { cacheExchange, createClient, fetchExchange } from "@urql/vue"
 import { AuthConfig, authExchange, AuthUtilities } from "@urql/exchange-auth"
 import { Auth } from "../services/auth"
 import { current } from "@/services/language"
-import { current as currentApp } from "@/services/app"
+import { currentApp as currentApp } from "@/services/app"
 import { webViewMain } from "@/services/webviews/mainHandler"
 
 const authExchangeFunction = async (
@@ -38,7 +33,6 @@ const authExchangeFunction = async (
 
 export default createClient({
     url: config.api.url + "/query",
-    maskTypename: false,
     fetch(input, init) {
         return fetch(
             input,
@@ -51,7 +45,6 @@ export default createClient({
         )
     },
     exchanges: [
-        dedupExchange,
         cacheExchange,
         authExchange(authExchangeFunction),
         fetchExchange,

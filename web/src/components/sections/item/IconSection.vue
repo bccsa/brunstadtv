@@ -1,10 +1,10 @@
 <template>
     <section>
         <SectionTitle v-if="item.title">{{ item.title }}</SectionTitle>
-        <div class="flex gap-4">
+        <div class="flex gap-4 flex-wrap">
             <div
                 v-for="(i, index) in item.items.items"
-                class="overflow-clip w-20 lg:w-40 hover:opacity-90 transition"
+                class="w-20 shrink-0 2xl:w-32 hover:opacity-90 transition"
                 @click="click(index)"
                 ref="sectionItem"
             >
@@ -29,9 +29,9 @@
                         size-source="width"
                     />
                 </div>
-                <div class="mx-auto">
+                <div class="mx-auto mt-1">
                     <p
-                        class="w-full text-center text-sm lg:text-lg line-clamp-2"
+                        class="w-full text-center text-style-body-2 line-clamp-2"
                     >
                         {{ i.title }}
                     </p>

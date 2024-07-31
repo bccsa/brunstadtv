@@ -18,6 +18,10 @@ provider "google" {
   region = var.gcp-region
 }
 
+provider "google-beta" {
+  region = var.gcp-region
+}
+
 module "vod_cdn" {
   source               = "./vod-cdn"
   env                  = var.env
@@ -77,3 +81,4 @@ module "imgx_cdn" {
     aws.us_east_1 = aws.us_east_1
   }
 }
+

@@ -5,15 +5,7 @@ import {
 
 export type ListItem = {
     id: string
-    type:
-        | "Episode"
-        | "Season"
-        | "Show"
-        | "Page"
-        | "Link"
-        | "StudyTopic"
-        | "Game"
-        | "Playlist"
+    type: SectionItemFragment["item"]["__typename"]
     title: string
     image?: string | null
     progress?: number | null
@@ -64,7 +56,7 @@ export const episodesToListItems = (
                 progress: i.progress,
                 description: i.description,
                 publishDate: i.publishDate,
-            } as ListItem)
+            }) as ListItem
     )
 
     return items

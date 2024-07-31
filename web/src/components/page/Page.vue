@@ -1,6 +1,14 @@
 <template>
     <section class="overflow-x-hidden">
-        <transition name="fade">
+        <transition
+            mode="out-in"
+            enter-active-class="duration-300 ease-out"
+            enter-from-class=" opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="duration-200 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class=" opacity-0"
+        >
             <div
                 class="px-4 lg:px-20 flex flex-col gap-8 relative"
                 v-if="page && page.sections.items.length"
@@ -12,6 +20,18 @@
                     :index="{ last: page.sections.total - 1, current: i }"
                     @load-more="appendItems(section)"
                     @click-item="(index) => clickItem(i, index)"
+                    v-motion
+                    :initial="{
+                        opacity: 0.01,
+                    }"
+                    :enter="{
+                        opacity: 1,
+                        transition: {
+                            duration: 1500,
+                            ease: TransitionPresets.easeOutExpo,
+                        },
+                    }"
+                    :delay="i < 10 ? i * 100 : 0"
                 >
                 </Section>
                 <div
@@ -28,8 +48,10 @@
             <div v-else-if="!fetching && !loading">
                 <NotFound :title="$t('page.notFound')"></NotFound>
             </div>
-            <div v-else-if="error">{{ error.message }}</div>
-            <!-- <SkeletonSections class="px-4 lg:px-20" v-else></SkeletonSections> -->
+            <div v-else-if="error">3{{ error.message }}</div>
+            <div v-else class="flex w-full h-48 items-center justify-center">
+                <Loader variant="spinner" />
+            </div>
         </transition>
     </section>
 </template>
@@ -45,7 +67,9 @@ import Section from "@/components/sections/Section.vue"
 import { computed, nextTick, onMounted, onUnmounted, ref } from "vue"
 import NotFound from "../NotFound.vue"
 import Loader from "../Loader.vue"
+import SkeletonSections from "./SkeletonSections.vue"
 import { goToSectionItem } from "@/utils/items"
+import { TransitionPresets } from "@vueuse/core"
 
 const props = defineProps<{
     pageId: string

@@ -90,6 +90,7 @@ func syncCollection[T any, TUpdate any](
 	var missingStrings []String
 	var editStrings []String
 	var deleteStrings []String
+	var unHideStrings []String
 	for _, str := range dbStrings {
 		if s, found := lo.Find(fileStrings, func(s String) bool {
 			return s.Identifier == str.Identifier
@@ -97,6 +98,10 @@ func syncCollection[T any, TUpdate any](
 			l.Debug().Str("identifier", str.Identifier).Msg("String not found, updating")
 			missingStrings = append(missingStrings, str)
 		} else {
+			if s.IsHidden {
+				unHideStrings = append(unHideStrings, s)
+				continue
+			}
 			if strings.TrimSpace(s.Text) != strings.TrimSpace(str.Text) || (strings.TrimSpace(str.Context) != "" && strings.TrimSpace(s.Context) != strings.TrimSpace(str.Context)) {
 				l.Debug().Str("source", str.Text).Str("value", s.Text).Msg("Texts are not identical, updating")
 				s.Text = str.Text
@@ -126,6 +131,17 @@ func syncCollection[T any, TUpdate any](
 			}
 		}
 	}
+
+	if len(unHideStrings) > 0 {
+		l.Debug().Int("count", len(unHideStrings)).Strs("identifiers", lo.Map(unHideStrings, func(i String, _ int) string {
+			return i.Identifier
+		})).Msg("Unhiding strings")
+		err = c.unHideStrings(project.ID, unHideStrings)
+		if err != nil {
+			return err
+		}
+	}
+
 	if len(editStrings) > 0 {
 		for _, str := range editStrings {
 			l.Debug().Str("identifier", str.Identifier).Msg("Editing string")

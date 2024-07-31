@@ -1,0 +1,27 @@
+{
+  "folders": [
+    {
+      "path": "backend"
+    },
+    {
+      "path": "migrations"
+    },
+    {
+      "path": "queries"
+    },
+    {
+      "path": "cms"
+    },
+    {
+      "path": "infra"
+    },
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.associations": {
+      "*.sql": "sql"
+    }
+  }
+}

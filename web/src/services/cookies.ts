@@ -1,4 +1,5 @@
 import { ref, watch } from "vue"
+import { webViewMain } from "@/services/webviews/mainHandler"
 
 const preferences = ref<boolean>()
 const statistics = ref<boolean>()
@@ -31,6 +32,13 @@ try {
 } catch {}
 
 export const useCookies = () => {
+    if (webViewMain) {
+        return {
+            preferences: ref(true),
+            statistics: ref(true),
+            accepted: ref(true),
+        }
+    }
     return {
         preferences,
         statistics,

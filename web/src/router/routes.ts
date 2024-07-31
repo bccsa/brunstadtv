@@ -7,6 +7,12 @@ export default [
         component: () => import("@/layout/StackedLayout.vue"),
         children: [
             {
+                name: "webview",
+                path: "/w/:code",
+                component: () => import("@/pages/w.vue"),
+                props: true,
+            },
+            {
                 name: "page",
                 path: ":pageId",
                 component: () => import("@/pages/page/Page.vue"),
@@ -51,19 +57,9 @@ export default [
                 props: true,
             },
             {
-                name: "calendar",
-                path: "/calendar",
-                component: () => import("@/pages/calendar/Calendar.vue"),
-            },
-            {
                 name: "search",
                 path: "/search",
                 component: () => import("@/pages/search/Search.vue"),
-            },
-            {
-                name: "live",
-                path: "/live",
-                component: () => import("@/pages/live/Live.vue"),
             },
             {
                 name: "series-redirect",
@@ -87,6 +83,13 @@ export default [
         ],
     },
     {
+        name: "live",
+        path: "/live",
+        beforeEnter: () => {
+            window.location.href = "https://live.bcc-connect.org"
+        },
+    },
+    {
         name: "embed",
         path: "/embed",
         component: () => import("@/pages/embed/Embed.vue"),
@@ -97,7 +100,28 @@ export default [
                 component: () => import("@/components/study/Lesson.vue"),
                 props: true,
             },
+            {
+                name: "comic",
+                path: "comic/:comicId",
+                component: () => import("@/components/comics/Comic.vue"),
+                props: true,
+            },
+            {
+                name: "quote-of-the-day",
+                path: "quote-of-the-day",
+                component: () =>
+                    import("@/components/quotes/QuoteOfTheDay.vue"),
+                props: true,
+            },
         ],
+    },
+    {
+        name: "delete-account",
+        path: "/delete-account",
+        component: () => import("@/pages/DeleteAccount.vue"),
+        props: {
+            title: "Delete my account",
+        },
     },
     {
         name: "not-found",

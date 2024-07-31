@@ -59,6 +59,7 @@
         "newEpisodes": ""
     },
     "episode": {
+        "chapters": "",
         "details": "",
         "episode": "",
         "episodes": "",
@@ -161,13 +162,19 @@
         "copied": "",
         "membersOnly": ""
     },
+    "quotes": {
+        "quoteOfTheDay": "",
+        "markAsRead": "",
+        "markAsUnread": ""
+    },
     "feedback": {
         "appreciated": "",
         "comment": "",
         "episodeTitle": "",
         "howEasyToUnderstand": "",
         "anonymousInfo": "",
-        "placeholder": ""
+        "placeholder": "",
+        "giveFeedback": ""
     },
     "contactLocalBukIfWrong": "",
     "thankYou": "",
@@ -201,5 +208,9 @@
     },
     "shorts": {
         "watchOnOurApp": ""
+    },
+    "subscriptions": {
+        "subscribe": "",
+        "unsubscribe": ""
     }
 }

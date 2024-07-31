@@ -232,10 +232,40 @@ func exportEpisodes(ctx context.Context, q serviceProvider, liteQueries *sqlexpo
 }
 
 func exportStreams(ctx context.Context, q serviceProvider, liteQueries *sqlexport.Queries, episodeIDs []int) error {
-	l := q.GetLoaders().StreamsLoader
-	streams, err := l.GetMany(ctx, episodeIDs)
+	ls := q.GetLoaders()
+
+	episodes, err := ls.EpisodeLoader.GetMany(ctx, episodeIDs)
 	if err != nil {
-		return merry.Wrap(err)
+		return err
+	}
+
+	var assetIDEpisodes = map[int][]int{}
+
+	addEpisodeToAsset := func(assetID int, episodeID int) {
+		if _, ok := assetIDEpisodes[assetID]; !ok {
+			assetIDEpisodes[assetID] = []int{}
+		}
+		if !lo.Contains(assetIDEpisodes[assetID], episodeID) {
+			assetIDEpisodes[assetID] = append(assetIDEpisodes[assetID], episodeID)
+		}
+	}
+
+	var assetIDs = map[int]*string{}
+	for _, e := range episodes {
+		if e.AssetID.Valid {
+			assetIDs[int(e.AssetID.Int64)] = nil
+			addEpisodeToAsset(int(e.AssetID.Int64), e.ID)
+		}
+		for key, v := range e.Assets {
+			lang := key
+			assetIDs[v] = &lang
+			addEpisodeToAsset(v, e.ID)
+		}
+	}
+
+	streams, err := ls.AssetStreamsLoader.GetMany(ctx, lo.Keys(assetIDs))
+	if err != nil {
+		return err
 	}
 
 	streamsFlat := lo.Flatten(streams)
@@ -252,17 +282,25 @@ func exportStreams(ctx context.Context, q serviceProvider, liteQueries *sqlexpor
 
 		audios, _ := json.Marshal(s.AudioLanguages)
 		subs, _ := json.Marshal(s.SubtitleLanguages)
-		err = liteQueries.InsertStream(ctx, sqlexport.InsertStreamParams{
-			ID:                int64(s.ID),
-			EpisodeID:         int64(s.EpisodeID),
-			AudioLanguages:    string(audios),
-			SubtitleLanguages: string(subs),
-			Type:              s.Type,
-			Url:               ss.URL,
-		})
+		videoLanguage := sql.NullString{}
+		if l, ok := assetIDs[s.AssetID]; ok && l != nil {
+			videoLanguage.Valid = true
+			videoLanguage.String = *l
+		}
 
-		if err != nil {
-			log.L.Debug().Err(err).Msg("Err while inserting stream")
+		for _, eID := range assetIDEpisodes[s.AssetID] {
+			err = liteQueries.InsertStream(ctx, sqlexport.InsertStreamParams{
+				ID:                int64(s.ID),
+				EpisodeID:         int64(eID),
+				AudioLanguages:    string(audios),
+				SubtitleLanguages: string(subs),
+				Type:              s.Type,
+				Url:               ss.URL,
+				VideoLanguage:     videoLanguage,
+			})
+			if err != nil {
+				log.L.Debug().Err(err).Msg("Err while inserting stream")
+			}
 		}
 	}
 
@@ -378,7 +416,7 @@ func exportCollections(ctx context.Context, q serviceProvider, liteQueries *sqle
 		if c == nil {
 			continue
 		}
-		entries, err := collection.GetCollectionEntries(ctx, q.GetLoaders(), filteredLoaders, c.ID)
+		entries, err := collection.GetBaseCollectionEntries(ctx, q.GetLoaders(), filteredLoaders, c.ID)
 		if err != nil {
 			return merry.Wrap(err)
 		}
@@ -423,6 +461,9 @@ func DoExport(ctx context.Context, q serviceProvider, bucketName string) (string
 		log.L.Error().Err(err).Str("exportStep", "initDB").Msg("")
 		return "", merry.Wrap(err, merry.WithUserMessage("Unable to generate export file"))
 	}
+	defer func() {
+		_ = os.Remove(dbPath)
+	}()
 
 	err = migrate(db)
 	if err != nil {

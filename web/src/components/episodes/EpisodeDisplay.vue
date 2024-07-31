@@ -1,10 +1,11 @@
 <template>
-    <section class="max-w-screen-2xl mx-auto rounded-2xl" v-if="episode">
+    <section class="max-w-screen-lg mx-auto rounded-2xl" v-if="episode">
         <div class="relative aspect-video w-full">
             <div
                 class="h-full w-full bg-secondary rounded-xl opacity-10 absolute"
             ></div>
             <EpisodeViewer
+                ref="viewerRef"
                 :context="context"
                 :auto-play="true"
                 class="drop-shadow-xl overflow-hidden"
@@ -16,7 +17,7 @@
             <div class="bg-primary-light p-4 w-full">
                 <div class="flex">
                     <h1
-                        class="text-style-title-2 lg:text-style-headline-2 text-customWhite"
+                        class="text-style-title-2 lg:text-style-headline-2 text-customWhite cursor-text"
                     >
                         {{ episode.title }}
                     </h1>
@@ -46,7 +47,7 @@
                     </h1>
                 </div>
                 <div
-                    class="text-label-3 mt-4 text-style-body-2 lg:text-style-body-2 [&_a]:text-tint-1 [&_a]:underline"
+                    class="text-label-3 mt-4 cursor-text text-style-body-2 lg:text-style-body-2 [&_a]:text-tint-1 [&_a]:underline"
                     v-html="mdToHTML(episode.description)"
                 ></div>
                 <!-- class="text-white mt-2 opacity-70 text-md lg:text-lg" -->
@@ -87,6 +88,18 @@
                         {{ $t("episode.episodes") }}
                     </button>
                     <button
+                        v-if="episode.chapters.length > 0"
+                        class="bg-primary-light uppercase border-separator-on-light border px-3 py-1 rounded-full transition duration-100"
+                        :class="[
+                            effectiveView === 'chapters'
+                                ? 'opacity-100 border-opacity-40 '
+                                : 'opacity-50 bg-opacity-0 border-opacity-0',
+                        ]"
+                        @click="effectiveView = 'chapters'"
+                    >
+                        {{ $t("episode.chapters") }}
+                    </button>
+                    <button
                         class="bg-primary-light uppercase border-gray border px-3 py-1 rounded-full transition duration-100"
                         :class="[
                             effectiveView === 'details'
@@ -112,10 +125,16 @@
                 </div>
                 <hr class="border-separator-on-light" />
                 <div>
-                    <Transition name="slide-fade" mode="out-in">
+                    <Transition name="fade" mode="out-in">
                         <EpisodeDetails
                             v-if="effectiveView === 'details'"
                             :episode="episode"
+                        />
+                        <EpisodeChapterList
+                            v-else-if="effectiveView === 'chapters'"
+                            :chapters="episode.chapters"
+                            :current-time="currentTime"
+                            @chapter-click="onChapterClick"
                         />
                         <div v-else-if="effectiveView === 'context'">
                             <ItemList
@@ -128,7 +147,12 @@
                                     )
                                 "
                                 :current-id="episode.id"
-                                @item-click="(i) => setEpisode(uuid ? (i as any).uuid : i.id)"
+                                @item-click="
+                                    (i) =>
+                                        setEpisode(
+                                            uuid ? (i as any).uuid : i.id
+                                        )
+                                "
                             ></ItemList>
                         </div>
                         <div
@@ -143,7 +167,12 @@
                             <ItemList
                                 :items="seasonEpisodes"
                                 :current-id="episode.id"
-                                @item-click="(i) => setEpisode(uuid ? (i as any).uuid : i.id)"
+                                @item-click="
+                                    (i) =>
+                                        setEpisode(
+                                            uuid ? (i as any).uuid : i.id
+                                        )
+                                "
                             ></ItemList>
                         </div>
                         <div v-else-if="effectiveView === 'download'">
@@ -160,13 +189,14 @@
 </template>
 <script lang="ts" setup>
 import {
+    ChapterListChapterFragment,
     EpisodeContext,
     GetEpisodeQuery,
     GetSeasonOnEpisodePageQuery,
     useGetEpisodeQuery,
     useGetSeasonOnEpisodePageQuery,
 } from "@/graph/generated"
-import { computed, nextTick, ref, watch } from "vue"
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue"
 import EpisodeViewer from "@/components/EpisodeViewer.vue"
 import EpisodeDetails from "@/components/episodes/EpisodeDetails.vue"
 import AgeRating from "@/components/episodes/AgeRating.vue"
@@ -178,10 +208,12 @@ import { episodesToListItems, toListItems } from "@/utils/lists"
 import { useAuth } from "@/services/auth"
 import SharePopover from "./SharePopover.vue"
 import LessonButton from "../study/LessonButton.vue"
+import EpisodeChapterList from "./EpisodeChapterList.vue"
 import router from "@/router"
 import { episodeComingSoon } from "../../utils/items"
 import EmbedDownloadables from "../embed/EmbedDownloadables.vue"
 import { mdToHTML } from "@/services/converter"
+import { usePlayerTime } from "@/composables/usePlayerTime"
 
 const props = defineProps<{
     initialEpisodeId: string
@@ -189,6 +221,13 @@ const props = defineProps<{
     uuid?: boolean
     autoPlay?: boolean
 }>()
+
+const viewerRef = ref<InstanceType<typeof EpisodeViewer> | null>(null)
+
+const seekTo = (seconds: number) => {
+    viewerRef.value?.player?.currentTime(seconds)
+}
+const { currentTime } = usePlayerTime(computed(() => viewerRef.value?.player))
 
 const { authenticated } = useAuth()
 
@@ -223,6 +262,7 @@ const { error, executeQuery } = useGetEpisodeQuery({
         episodeId,
         context,
     },
+    requestPolicy: "network-only",
 })
 
 const lesson = computed(() => episode.value?.lessons.items[0])
@@ -252,12 +292,13 @@ const seasonEpisodes = computed(() => {
 const loadSeason = async () => {
     season.value = null
     if (seasonId.value) {
+        await nextTick()
         const r = await seasonQuery.executeQuery()
         season.value = r.data.value?.season ?? null
     }
 }
 
-watch(() => seasonId.value, loadSeason)
+watch(seasonId, loadSeason)
 
 const load = async () => {
     loading.value = true
@@ -279,7 +320,9 @@ const load = async () => {
 }
 
 load()
-const view = ref(null as "episodes" | "details" | "context" | "download" | null)
+const view = ref(
+    null as "episodes" | "details" | "context" | "download" | "chapters" | null
+)
 
 const effectiveView = computed({
     get() {
@@ -295,6 +338,11 @@ const effectiveView = computed({
             case "episodes":
                 if (episode.value?.season) {
                     return "episodes"
+                }
+                break
+            case "chapters":
+                if (episode.value?.chapters.length) {
+                    return "chapters"
                 }
                 break
             case "details":
@@ -319,5 +367,13 @@ const loadNext = async () => {
         await nextTick()
         await load()
     }
+}
+
+const onChapterClick = (chapter: ChapterListChapterFragment) => {
+    seekTo(chapter.start)
+    scrollTo({
+        behavior: "smooth",
+        top: 0,
+    })
 }
 </script>
