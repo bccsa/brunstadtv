@@ -5,8 +5,7 @@
         ref="imageContainer"
     >
         <img
-            ref="image"
-            class="object-cover h-full w-full transition" 
+            class="object-cover h-full w-full transition"
             :class="[!loaded ? 'opacity-0' : 'opacity-100']"
             :height="effectiveHeight"
             :width="effectiveWidth"
@@ -45,42 +44,19 @@ const handleResize = () => {
     }
     const parent = imageContainer.value
     if (parent) {
-        dimensions.height = parent.clientHeight
-        dimensions.width = parent.clientWidth
+        dimensions.height = parent.clientHeight || 540 // btv_box: set smallest height and width for parant with height 0 (used for preloading)
+        dimensions.width = parent.clientWidth || 960 // btv_box: set smallest height and width for parant with height 0 (used for preloading)
     }
     parentDimensions.value = dimensions
 }
 
-onBeforeUnmount(() => {
-    window.removeEventListener("resize", handleResize)
+onMounted(() => {
     handleResize()
     window.addEventListener("resize", handleResize)
 })
 
-onMounted(() => {
-    setTimeout(() => {
-        const dimensions = {
-            height: 100,
-            width: 100,
-        }
-        const parent = imageContainer.value
-        if (parent) {
-            dimensions.height = parent.clientHeight || 540 // btv_box: set smallest height and width for parant with height 0 (used for preloading)
-            dimensions.width = parent.clientWidth || 960 // btv_box: set smallest height and width for parant with height 0 (used for preloading)
-        }
-        parentDimensions.value = dimensions
-        const i = image.value
-        if (!i) {
-            return
-        }
-        i.onerror = () => {}
-        i.onload = () => {
-            loaded.value = true
-        }
-        if (props.src) {
-            i.src = effectiveSrc.value
-        }
-    }, 50)
+onBeforeUnmount(() => {
+    window.removeEventListener("resize", handleResize)
 })
 
 const effectiveSrc = computed(() => {
