@@ -41,9 +41,6 @@ func EpisodeFrom(ctx context.Context, e *common.Episode) *Episode {
 	}
 
 	var image *string
-	if e.Image.Valid {
-		image = &e.Image.String
-	}
 	if image == nil {
 		image = e.Images.GetDefault(languages, common.ImageStyleDefault)
 	}
@@ -92,6 +89,7 @@ func EpisodeFrom(ctx context.Context, e *common.Episode) *Episode {
 		AgeRating:             e.AgeRating,
 		ImageURL:              image,
 		Images:                images,
+		AssetVersion:          e.AssetVersion,
 	}
 
 	if e.Number.Valid {

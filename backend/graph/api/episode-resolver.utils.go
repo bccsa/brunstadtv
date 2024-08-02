@@ -54,7 +54,7 @@ func (r *episodeResolver) getEpisodeQueue(ctx context.Context, episodeID string)
 	// If the EpisodeContext has a valid CollectionID, use the collectionID to retrieve episodeIDs
 	// else, use the episodes in the season (if any)
 	if episodeContext.CollectionID.Valid {
-		items, err := collection.GetCollectionEntries(ctx, r.Loaders, r.GetFilteredLoaders(ctx), int(episodeContext.CollectionID.Int64))
+		items, err := collection.GetBaseCollectionEntries(ctx, r.Loaders, r.GetFilteredLoaders(ctx), int(episodeContext.CollectionID.Int64))
 		if err != nil {
 			return nil, err
 		}
@@ -129,18 +129,18 @@ func (r *episodeResolver) getRootEpisodeID(ctx context.Context) (string, error) 
 	return "", fmt.Errorf("no root episode found")
 }
 
-func (r *episodeResolver) getEpisodeCursor(ctx context.Context, episodeID string) (*utils.Cursor[int], error) {
+func (r *episodeResolver) getEpisodeCursor(ctx context.Context, episodeID string) (*utils.ItemCursor[int], error) {
 	ctx, span := otel.Tracer("episode-resolver").Start(ctx, "getEpisodeCursor")
 	defer span.End()
-	return utils.GetOrSetContextWithLock(ctx, "cursor-lock-"+episodeID, func() (*utils.Cursor[int], error) {
+	return utils.GetOrSetContextWithLock(ctx, "cursor-lock-"+episodeID, func() (*utils.ItemCursor[int], error) {
 		intID := utils.AsInt(episodeID)
 		episodeContext, err := r.getEpisodeContext(ctx, episodeID)
 		if err != nil {
 			return nil, err
 		}
-		var cursor *utils.Cursor[int]
+		var cursor *utils.ItemCursor[int]
 		if episodeContext.Cursor.Valid {
-			cursor, err = utils.ParseCursor[int](episodeContext.Cursor.String)
+			cursor, err = utils.ParseItemCursor[int](episodeContext.Cursor.String)
 			if err != nil {
 				return nil, err
 			}
@@ -166,7 +166,7 @@ func (r *episodeResolver) getEpisodeCursor(ctx context.Context, episodeID string
 					return id != intID
 				}))...)
 			}
-			cursor = utils.ToCursor(episodeIDs, intID)
+			cursor = utils.ToItemCursor(episodeIDs, intID)
 		}
 		return cursor, nil
 	})
@@ -240,7 +240,7 @@ func (r *episodeResolver) getNextEpisodeIDsFromShowCollection(ctx context.Contex
 	if err != nil || show == nil || !show.RelatedCollectionID.Valid {
 		return nil, err
 	}
-	entries, err := collection.GetCollectionEntries(ctx, r.Loaders, r.GetFilteredLoaders(ctx), int(show.RelatedCollectionID.Int64))
+	entries, err := collection.GetBaseCollectionEntries(ctx, r.Loaders, r.GetFilteredLoaders(ctx), int(show.RelatedCollectionID.Int64))
 	if err != nil {
 		return nil, err
 	}
@@ -280,10 +280,14 @@ func (r *episodeResolver) getRelatedEpisodeIDs(ctx context.Context, episodeID st
 	return episodeIDs, nil
 }
 
-func (r *episodeResolver) getTitleFromContext(ctx context.Context, obj *model.Episode) (string, error) {
+func (r *episodeResolver) getTitleFromContext(ctx context.Context, obj *model.Episode, languages *[]string) (string, error) {
 	episode, err := r.Loaders.EpisodeLoader.Get(ctx, utils.AsInt(obj.ID))
 	if err != nil {
 		return "", err
+	}
+
+	if languages != nil {
+		return episode.Title.Get(*languages), nil
 	}
 
 	if obj.Number == nil {
@@ -315,4 +319,32 @@ func (r *episodeResolver) getTitleWithCollection(ctx context.Context, episode *m
 		return fmt.Sprintf("%d. %s", *episode.Number, episode.Title), nil
 	}
 	return episode.Title, nil
+}
+
+func (r *episodeResolver) getChapters(ctx context.Context, episodeId string) ([]*model.Chapter, error) {
+	i, err := r.Loaders.EpisodeLoader.Get(ctx, utils.AsInt(episodeId))
+	if err != nil || !i.AssetID.Valid {
+		return nil, err
+	}
+	metadataItems, err := r.Loaders.TimedMetadataLoader.GetMany(ctx, i.TimedMetadataIDs)
+	if err != nil {
+		return nil, err
+	}
+	metadataItems = lo.Filter(metadataItems, func(i *common.TimedMetadata, _ int) bool {
+		return i.Type == "chapter"
+	})
+
+	r.Loaders.PhraseLoader.LoadMany(ctx, lo.Uniq(lo.Map(metadataItems, func(i *common.TimedMetadata, _ int) string {
+		return i.ContentType.Value
+	})))
+
+	var out []*model.Chapter
+	for _, tm := range metadataItems {
+		chapter, err := resolveChapter(ctx, r.Loaders, episodeId, tm.ID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, chapter)
+	}
+	return out, nil
 }

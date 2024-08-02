@@ -8,7 +8,9 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/bcc-code/bcc-media-platform/backend/common"
 	"github.com/bcc-code/bcc-media-platform/backend/sqlc"
+	"github.com/bcc-code/bcc-media-platform/backend/utils"
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 )
 
 var statsLanguages = []string{"no", "en", "de", "nl"}
@@ -34,7 +36,7 @@ func asJsonString[T any](o T) string {
 type Show struct {
 	ID            int                 `json:"id"`
 	Type          string              `json:"type"`
-	TagIDs        string              `json:"tagIds"`
+	Tags          string              `json:"tags"`
 	PublicTitle   bigquery.NullString `json:"publicTitle"`
 	Title         bigquery.NullString `json:"title"`
 	Description   bigquery.NullString `json:"description"`
@@ -45,11 +47,11 @@ type Show struct {
 	Deleted       *time.Time
 }
 
-func ShowFromCommon(s common.Show, _ int) Show {
+func ShowFromCommon(s common.Show, tags []common.Tag) Show {
 	return Show{
 		ID:            s.ID,
 		Type:          s.Type,
-		TagIDs:        asJsonString(s.TagIDs),
+		Tags:          tagsToJson(tags),
 		PublicTitle:   nullStr(s.PublicTitle.Ptr()),
 		Title:         nullStr(s.Title.GetValueOrNil(statsLanguages)),
 		Description:   nullStr(s.Description.GetValueOrNil(statsLanguages)),
@@ -63,7 +65,7 @@ func ShowFromCommon(s common.Show, _ int) Show {
 // Season is the definition of the Season object
 type Season struct {
 	ID            int    `json:"id"`
-	TagIDs        string `json:"tagIds"`
+	Tags          string `json:"tags"`
 	Number        int
 	AgeRating     string
 	PublicTitle   bigquery.NullString `json:"publicTitle"`
@@ -77,10 +79,11 @@ type Season struct {
 	Deleted       *time.Time
 }
 
-func SeasonFromCommon(s common.Season, _ int) Season {
+func SeasonFromCommon(s common.Season, tags []common.Tag) Season {
+
 	return Season{
 		ID:            s.ID,
-		TagIDs:        asJsonString(s.TagIDs),
+		Tags:          tagsToJson(tags),
 		Number:        s.Number,
 		AgeRating:     s.AgeRating,
 		ShowID:        s.ShowID,
@@ -111,7 +114,7 @@ type Episode struct {
 	ImagePoster           bigquery.NullString `json:"image_poster"`
 	Duration              int                 `json:"duration"`
 	AgeRating             string              `json:"ageRating"`
-	TagIDs                string              `json:"tagIds"`
+	Tags                  string              `json:"tags"`
 	PublicTitle           bigquery.NullString `json:"publicTitle"`
 	Title                 bigquery.NullString `json:"title"`
 	Description           bigquery.NullString `json:"description"`
@@ -124,7 +127,7 @@ type Episode struct {
 	ContentType           bigquery.NullString `json:"contentType"`
 }
 
-func EpisodeFromCommon(e common.Episode, _ int) Episode {
+func EpisodeFromCommon(e common.Episode, tags []common.Tag) Episode {
 	legacyEpisodeID := bigquery.NullString{
 		Valid:     e.LegacyID.Valid,
 		StringVal: fmt.Sprintf("E%d", e.LegacyID.ValueOrZero()),
@@ -152,7 +155,7 @@ func EpisodeFromCommon(e common.Episode, _ int) Episode {
 		ImagePoster:           nullStr(e.Images.GetDefault(statsLanguages, common.ImageStylePoster)),
 		Duration:              e.Duration,
 		AgeRating:             e.AgeRating,
-		TagIDs:                asJsonString(e.TagIDs),
+		Tags:                  tagsToJson(tags),
 		PublicTitle:           nullStr(e.PublicTitle.Ptr()),
 		Title:                 nullStr(e.Title.GetValueOrNil(statsLanguages)),
 		Description:           nullStr(e.Description.GetValueOrNil(statsLanguages)),
@@ -171,7 +174,7 @@ type TimedMetadata struct {
 	Timestamp   float64             `json:"timestamp"`
 	Title       bigquery.NullString `json:"title"`
 	Description bigquery.NullString `json:"description"`
-	ChapterType bigquery.NullString `json:"chapterType"`
+	ContentType bigquery.NullString `json:"contentType"`
 	PersonIDs   string              `json:"personIds"`
 	SongID      uuid.NullUUID       `json:"songId"`
 }
@@ -183,7 +186,7 @@ func TimedMetadataFromCommon(tm common.TimedMetadata, _ int) TimedMetadata {
 		Title:       nullStr(tm.Title.GetValueOrNil(statsLanguages)),
 		Description: nullStr(tm.Description.GetValueOrNil(statsLanguages)),
 		Timestamp:   tm.Timestamp,
-		ChapterType: nullStr(&tm.ChapterType.Value),
+		ContentType: nullStr(&tm.ContentType.Value),
 		PersonIDs:   asJsonString(tm.PersonIDs),
 		SongID:      tm.SongID,
 	}
@@ -221,4 +224,70 @@ func MediaItemFromDb(mi sqlc.Mediaitem, _ int) MediaItem {
 		ParentStarts:  bigquery.NullFloat64(mi.ParentStartsAt),
 		ParentEnds:    bigquery.NullFloat64(mi.ParentEndsAt),
 	}
+}
+
+type Short struct {
+	ID          string               `bigquery:"id"`
+	MediaID     string               `bigquery:"media_id"`
+	AssetID     string               `bigquery:"asset_id"`
+	Label       string               `bigquery:"label"`
+	EpisodeID   string               `bigquery:"episode_id"`
+	Status      string               `bigquery:"status"`
+	StartsAt    bigquery.NullFloat64 `bigquery:"starts_at"`
+	EndsAt      bigquery.NullFloat64 `bigquery:"ends_at"`
+	Image       bigquery.NullString  `bigquery:"image"`
+	DateUpdated time.Time            `bigquery:"date_updated"`
+	Tags        string               `bigquery:"tags"`
+}
+
+func ShortFromCommon(s common.Short, tags []common.Tag) Short {
+	return Short{
+		ID:          s.ID.String(),
+		MediaID:     s.MediaID.String(),
+		AssetID:     fmt.Sprint(s.AssetID.Int64),
+		Label:       s.Label,
+		EpisodeID:   fmt.Sprint(s.EpisodeID.Int64),
+		StartsAt:    bigquery.NullFloat64(s.StartsAt.NullFloat64),
+		EndsAt:      bigquery.NullFloat64(s.EndsAt.NullFloat64),
+		Image:       nullStr(s.Images.GetDefault([]string{"no"}, common.ImageStyleDefault)),
+		DateUpdated: s.DateUpdated,
+		Status:      string(s.Status),
+		Tags:        tagsToJson(tags),
+	}
+}
+
+type CalendarEntry struct {
+	ID       string              `bigquery:"id"`
+	EventID  bigquery.NullString `bigquery:"event_id"`
+	Title    string              `bigquery:"title"`
+	Start    time.Time           `bigquery:"start"`
+	End      time.Time           `bigquery:"end"`
+	Type     bigquery.NullString `bigquery:"type"`
+	IsReplay bool                `bigquery:"is_replay"`
+	ItemID   bigquery.NullString `bigquery:"item_id"`
+}
+
+func CalendarEntryFromCommon(c common.CalendarEntry, _ int) CalendarEntry {
+	var eventID *string
+	if c.EventID.Valid {
+		e := fmt.Sprint(c.EventID.Int64)
+		eventID = &e
+	}
+
+	return CalendarEntry{
+		ID:       fmt.Sprint(c.ID),
+		EventID:  nullStr(eventID),
+		Title:    c.Title.Get(*utils.FallbackLanguages()),
+		Start:    c.Start,
+		End:      c.End,
+		Type:     nullStr(c.Type.Ptr()),
+		IsReplay: c.IsReplay,
+		ItemID:   nullIntToBQNullString(c.ItemID),
+	}
+}
+
+func tagsToJson(tags []common.Tag) string {
+	return asJsonString(lo.Map(tags, func(t common.Tag, _ int) string {
+		return t.Code
+	}))
 }

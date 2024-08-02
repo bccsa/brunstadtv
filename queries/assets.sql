@@ -1,7 +1,8 @@
 -- name: getFilesForEpisodes :many
 SELECT e.id AS episodes_id, f.*
 FROM episodes e
-         JOIN assets a ON e.asset_id = a.id
+         JOIN mediaitems mi ON mi.id = e.mediaitem_id
+         JOIN assets a ON mi.asset_id = a.id
          JOIN assetfiles f ON a.id = f.asset_id
 WHERE e.id = ANY ($1::int[]);
 
@@ -15,14 +16,16 @@ WHERE a.id = ANY ($1::int[]);
 -- name: getStreamsForEpisodes :many
 WITH audiolang AS (SELECT s.id, array_agg(al.languages_code) langs
                    FROM episodes e
-                            JOIN assets a ON e.asset_id = a.id
+                            JOIN mediaitems mi ON mi.id = e.mediaitem_id
+                            JOIN assets a ON mi.asset_id = a.id
                             LEFT JOIN assetstreams s ON a.id = s.asset_id
                             LEFT JOIN assetstreams_audio_languages al ON al.assetstreams_id = s.id
                    WHERE al.languages_code IS NOT NULL
                    GROUP BY s.id),
      sublang AS (SELECT s.id, array_agg(al.languages_code) langs
                  FROM episodes e
-                          JOIN assets a ON e.asset_id = a.id
+                          JOIN mediaitems mi ON mi.id = e.mediaitem_id
+                          JOIN assets a ON mi.asset_id = a.id
                           LEFT JOIN assetstreams s ON a.id = s.asset_id
                           LEFT JOIN assetstreams_subtitle_languages al ON al.assetstreams_id = s.id
                  WHERE al.languages_code IS NOT NULL
@@ -32,7 +35,8 @@ SELECT e.id AS                          episodes_id,
        COALESCE(al.langs, '{}')::text[] audio_languages,
        COALESCE(sl.langs, '{}')::text[] subtitle_languages
 FROM episodes e
-         JOIN assets a ON e.asset_id = a.id
+         JOIN mediaitems mi ON mi.id = e.mediaitem_id
+         JOIN assets a ON mi.asset_id = a.id
          JOIN assetstreams s ON a.id = s.asset_id
          LEFT JOIN audiolang al ON al.id = s.id
          LEFT JOIN sublang sl ON sl.id = s.id
@@ -76,10 +80,17 @@ FROM assets
 WHERE aws_arn = @aws_arn::varchar
 LIMIT 1;
 
+-- name: AssetIDsByMediabankenIDAndMinimumDuration :many
+SELECT id
+FROM assets
+WHERE mediabanken_id = @mediabanken_id::varchar AND duration > @minimum_duration::int
+ORDER BY date_created DESC;
+
 -- name: InsertAsset :one
 INSERT INTO assets (duration, encoding_version, legacy_id, main_storage_path,
                     mediabanken_id, name, status, aws_arn, source, date_updated, date_created)
-VALUES (@duration, @encoding_version, @legacy_id, @main_storage_path, @mediabanken_id, @name, @status, @aws_arn, @source, NOW(),
+VALUES (@duration, @encoding_version, @legacy_id, @main_storage_path, @mediabanken_id, @name, @status, @aws_arn,
+        @source, NOW(),
         NOW())
 RETURNING id;
 
@@ -125,3 +136,8 @@ INSERT INTO assetstreams_subtitle_languages (assetstreams_id, languages_code)
 VALUES (@assetstreams_id, @languages_code)
 RETURNING id;
 
+-- name: GetAssetStoragePath :one
+SELECT main_storage_path
+FROM assets
+WHERE id = @id
+LIMIT 1;

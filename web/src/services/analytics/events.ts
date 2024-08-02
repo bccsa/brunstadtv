@@ -1,11 +1,11 @@
 import { GetPageQuery, SectionItemFragment } from "@/graph/generated"
+import { apiObject } from "rudder-sdk-js"
 
 type StringWithAutocomplete<T> = T | (string & {})
 
 export type Page = StringWithAutocomplete<
     | "about"
     | "calendar"
-    | "livestream"
     | "login"
     | "profileEdit"
     | "profile"
@@ -14,14 +14,15 @@ export type Page = StringWithAutocomplete<
     | "support"
     | "faq"
     | "episode"
+    | "comic"
 >
 
 export type IdentifyData = {
     id: string
-    ageGroup: string
-    country: string
-    churchId: string
-    gender: string
+    ageGroup?: string
+    country?: string
+    churchId?: string
+    gender?: string
 }
 
 export type AgeGroup =
@@ -35,18 +36,7 @@ export type AgeGroup =
     | "51 - 64"
     | "65+"
 
-type ElementType = SectionItemFragment["item"]["__typename"]
-
-type VideoEvent = {
-    sessionId: string
-    livestream: boolean
-    contentPodId: string
-    position?: number
-    totalLength: number
-    videoPlayer: "videojs"
-    fullScreen: boolean
-    hasVideo: true
-}
+type ElementType = SectionItemFragment["item"]["__typename"] | "Comic" | "Quote"
 
 export type Events = {
     section_clicked: {
@@ -100,15 +90,22 @@ export type Events = {
     logout: undefined
     airplay_started: undefined
     chromecast_started: undefined
-    playback_started: VideoEvent
-    playback_paused: VideoEvent
-    playback_ended: VideoEvent
-    playback_interrupted: VideoEvent
-    playback_buffering_started: VideoEvent
     episode_download: {
         episodeId: string
         fileName: string
         audioLanguage: string
         resolution: string
+    }
+    interaction: {
+        interaction: string
+        contextElementType: ElementType
+        contextElementId: string
+        meta?: apiObject
+    }
+    viewing: {
+        pageCode?: Page
+        elementType?: ElementType
+        elementId?: string
+        meta?: apiObject
     }
 }

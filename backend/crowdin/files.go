@@ -2,11 +2,12 @@ package crowdin
 
 import (
 	"fmt"
+	"strconv"
+	"time"
+
 	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/bcc-code/mediabank-bridge/log"
 	"github.com/samber/lo"
-	"strconv"
-	"time"
 )
 
 type addStringRequest struct {
@@ -132,6 +133,33 @@ func (c *Client) hideStrings(projectID int, strs []String) error {
 				Op:    "replace",
 				Path:  fmt.Sprintf("/%d/isHidden", str.ID),
 				Value: true,
+			})
+		}
+		req.SetResult(Object[[]Object[String]]{})
+		req.SetBody(body)
+		res, err := req.Patch(fmt.Sprintf("projects/%d/strings", projectID))
+		if err != nil {
+			return err
+		}
+		err = ensureSuccess(res)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Client) unHideStrings(projectID int, strs []String) error {
+	chunks := lo.Chunk(strs, 20)
+	for _, chunk := range chunks {
+		req := c.c.R()
+		req.SetHeader("Content-Type", "application/json")
+		var body []patchRequest
+		for _, str := range chunk {
+			body = append(body, patchRequest{
+				Op:    "replace",
+				Path:  fmt.Sprintf("/%d/isHidden", str.ID),
+				Value: false,
 			})
 		}
 		req.SetResult(Object[[]Object[String]]{})

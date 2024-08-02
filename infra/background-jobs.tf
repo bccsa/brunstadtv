@@ -93,6 +93,16 @@ resource "google_cloud_run_service" "background_worker" {
           value = google_sql_user.background_worker.name
         }
 
+        env {
+          name  = "VIDEOMANIPULATOR_BASE_URL"
+          value = "${module.videomanipulator.url}/"
+        }
+
+        env {
+          name  = "VIDEOMANIPULATOR_API_KEY"
+          value = module.videomanipulator.api_key
+        }
+
         dynamic "env" {
           for_each = module.background_worker_secrets.data
           iterator = v

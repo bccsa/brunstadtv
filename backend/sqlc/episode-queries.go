@@ -3,32 +3,34 @@ package sqlc
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/bcc-code/bcc-media-platform/backend/common"
 	"github.com/bcc-code/bcc-media-platform/backend/loaders"
 	"github.com/samber/lo"
-	"gopkg.in/guregu/null.v4"
 )
 
 func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 	return lo.Map(episodes, func(e getEpisodesRow, _ int) common.Episode {
-		var title common.LocaleString
-		var description common.LocaleString
-		var extraDescription common.LocaleString
+		var title = common.LocaleString{}
+		var description = common.LocaleString{}
+		var extraDescription = common.LocaleString{}
 
-		_ = json.Unmarshal(e.Title.RawMessage, &title)
-		_ = json.Unmarshal(e.Description.RawMessage, &description)
+		_ = json.Unmarshal(e.Title, &title)
+		_ = json.Unmarshal(e.Description, &description)
 		_ = json.Unmarshal(e.ExtraDescription.RawMessage, &extraDescription)
 
-		var assetIDs common.LocaleMap[int]
-		_ = json.Unmarshal(e.Assets.RawMessage, &assetIDs)
+		title["no"] = e.OriginalTitle
+		description["no"] = e.OriginalDescription
 
-		var image null.String
-		if e.ImageFileName.Valid {
-			image = null.StringFrom(fmt.Sprintf("https://%s/%s", q.getImageCDNDomain(), e.ImageFileName.String))
+		var assetIDs common.LocaleMap[int]
+		_ = json.Unmarshal(e.Assets, &assetIDs)
+
+		assetVersion := ""
+		if e.AssetDateUpdated.Valid {
+			assetVersion = e.AssetDateUpdated.Time.Format(time.RFC3339)
 		}
 
 		return common.Episode{
@@ -45,7 +47,7 @@ func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 			Description:           description,
 			ExtraDescription:      extraDescription,
 			ProductionDateInTitle: e.PublishDateInTitle,
-			PublishDate:           e.PublishDate,
+			PublishDate:           e.PublishedAt,
 			ProductionDate:        e.ProductionDate,
 			AvailableFrom:         e.AvailableFrom,
 			AvailableTo:           e.AvailableTo,
@@ -53,7 +55,7 @@ func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 			SeasonID:              e.SeasonID,
 			AssetID:               e.AssetID,
 			Assets:                assetIDs,
-			Image:                 image,
+			AssetVersion:          assetVersion,
 			Images:                q.getImages(e.Images),
 			AgeRating:             e.Agerating,
 			Duration:              int(e.Duration.ValueOrZero()),
@@ -62,8 +64,64 @@ func (q *Queries) mapToEpisodes(episodes []getEpisodesRow) []common.Episode {
 			TagIDs: lo.Map(e.TagIds, func(id int32, _ int) int {
 				return int(id)
 			}),
-			TimedMetadataIDs:       e.TimedmetadataIds,
-			TimedMetadataFromAsset: e.TimedmetadataFromAsset,
+			TimedMetadataIDs: e.TimedmetadataIds,
+		}
+	})
+}
+
+func (q *Queries) mapListToEpisodes(episodes []listEpisodesRow) []common.Episode {
+	return lo.Map(episodes, func(e listEpisodesRow, _ int) common.Episode {
+		var title = common.LocaleString{}
+		var description = common.LocaleString{}
+		var extraDescription = common.LocaleString{}
+
+		_ = json.Unmarshal(e.Title.RawMessage, &title)
+		_ = json.Unmarshal(e.Description.RawMessage, &description)
+		_ = json.Unmarshal(e.ExtraDescription.RawMessage, &extraDescription)
+
+		title["no"] = e.OriginalTitle
+		description["no"] = e.OriginalDescription
+
+		var assetIDs common.LocaleMap[int]
+		_ = json.Unmarshal(e.Assets.RawMessage, &assetIDs)
+
+		assetVersion := ""
+		if e.AssetDateUpdated.Valid {
+			assetVersion = e.AssetDateUpdated.Time.Format(time.RFC3339)
+		}
+
+		return common.Episode{
+			ID:                    int(e.ID),
+			UUID:                  e.Uuid,
+			Status:                common.StatusFrom(e.Status),
+			Type:                  e.Type,
+			LegacyID:              e.LegacyID,
+			LegacyProgramID:       e.LegacyProgramID,
+			PublicTitle:           e.PublicTitle,
+			PreventPublicIndexing: e.PreventPublicIndexing,
+			NumberInTitle:         e.NumberInTitle.Bool,
+			Title:                 title,
+			Description:           description,
+			ExtraDescription:      extraDescription,
+			ProductionDateInTitle: e.PublishDateInTitle,
+			PublishDate:           e.PublishedAt.Time,
+			ProductionDate:        e.ProductionDate.Time,
+			AvailableFrom:         e.AvailableFrom,
+			AvailableTo:           e.AvailableTo,
+			Number:                e.EpisodeNumber,
+			SeasonID:              e.SeasonID,
+			AssetID:               e.AssetID,
+			Assets:                assetIDs,
+			AssetVersion:          assetVersion,
+			Images:                q.getImages(e.Images.RawMessage),
+			AgeRating:             e.Agerating,
+			Duration:              int(e.Duration.ValueOrZero()),
+			Audience:              e.Audience,
+			ContentType:           e.ContentType,
+			TagIDs: lo.Map(e.TagIds, func(id int32, _ int) int {
+				return int(id)
+			}),
+			TimedMetadataIDs: e.TimedmetadataIds,
 		}
 	})
 }
@@ -83,8 +141,8 @@ func (q *Queries) ListEpisodes(ctx context.Context) ([]common.Episode, error) {
 	if err != nil {
 		return nil, err
 	}
-	return q.mapToEpisodes(lo.Map(items, func(i listEpisodesRow, _ int) getEpisodesRow {
-		return getEpisodesRow(i)
+	return q.mapListToEpisodes(lo.Map(items, func(i listEpisodesRow, _ int) listEpisodesRow {
+		return listEpisodesRow(i)
 	})), nil
 }
 
@@ -232,5 +290,15 @@ func (rq *RoleQueries) GetEpisodeIDsWithTagIDs(ctx context.Context, ids []int) (
 			ID:       int(i.ID),
 			ParentID: int(i.ParentID),
 		}
+	}), nil
+}
+
+func (q *Queries) GetEpisodeIDsByMediaItemID(ctx context.Context, id uuid.UUID) ([]int, error) {
+	rows, err := q.getEpisodeIDsByMediaItemID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return lo.Map(rows, func(id int32, _ int) int {
+		return int(id)
 	}), nil
 }

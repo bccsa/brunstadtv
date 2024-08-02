@@ -2,15 +2,17 @@ package asset
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/url"
 	"path"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/bcc-code/bcc-media-platform/backend/files"
 	"github.com/bcc-code/bcc-media-platform/backend/sqlc"
+	"github.com/bcc-code/bcc-media-platform/backend/videomanipulator"
 	"github.com/davecgh/go-spew/spew"
 	"gopkg.in/guregu/null.v4"
 
@@ -49,6 +51,9 @@ type externalServices interface {
 	GetS3Client() *s3.Client
 	GetMediaPackageVOD() *mediapackagevod.Client
 	GetQueries() *sqlc.Queries
+	GetDatabase() *sql.DB
+	GetFileService() files.Service
+	GetVideoManipulatorService() *videomanipulator.VideoManipulatorService
 }
 
 type config interface {
@@ -225,7 +230,11 @@ func Ingest(ctx context.Context, services externalServices, config config, event
 	hasStreams := assetMeta.SmilFile != ""
 
 	log.L.Debug().Str("smilFile", assetMeta.SmilFile).Msg("Smil Path")
+	destStreamFolder := path.Join(storagePrefix, "stream")
+	destSmilPath := path.Join(destStreamFolder, path.Base(assetMeta.SmilFile))
+
 	if hasStreams {
+		log.L.Debug().Msg("Copying streams")
 		smilPath := path.Join(assetMeta.BasePath, assetMeta.SmilFile)
 		smilValue, err := readSmilFroms3(ctx, s3client, config.GetIngestBucket(), smilPath)
 		if err != nil {
@@ -234,14 +243,14 @@ func Ingest(ctx context.Context, services externalServices, config config, event
 
 		coi := &s3.CopyObjectInput{
 			Bucket:     config.GetStorageBucket(),
-			Key:        aws.String(path.Join(storagePrefix, "stream", path.Base(assetMeta.SmilFile))),
+			Key:        aws.String(destSmilPath),
 			CopySource: aws.String(path.Join(*config.GetIngestBucket(), assetMeta.BasePath, assetMeta.SmilFile)),
 		}
 
 		filesToCopy[*coi.Key] = coi
 
 		for _, file := range smilValue.Body.Switch.Videos {
-			target := path.Join(storagePrefix, "stream", path.Base(file.Src))
+			target := path.Join(destStreamFolder, path.Base(file.Src))
 			src := path.Join(*config.GetIngestBucket(), assetMeta.BasePath, file.Src)
 			coi := &s3.CopyObjectInput{
 				Bucket:     config.GetStorageBucket(),
@@ -256,7 +265,7 @@ func Ingest(ctx context.Context, services externalServices, config config, event
 		}
 
 		for _, sub := range smilValue.Body.Switch.Subs {
-			target := path.Join(storagePrefix, "stream", path.Base(sub.Src))
+			target := path.Join(destStreamFolder, path.Base(sub.Src))
 			src := path.Join(*config.GetIngestBucket(), assetMeta.BasePath, sub.Src)
 			coi := &s3.CopyObjectInput{
 				Bucket:     config.GetStorageBucket(),
@@ -273,63 +282,13 @@ func Ingest(ctx context.Context, services externalServices, config config, event
 	}
 
 	if assetMeta.ChaptersFile != "" {
-		var chapters []Chapter
-		chaptersPath := filepath.Join(assetMeta.BasePath, assetMeta.ChaptersFile)
-		err = readJSONFromS3(ctx, s3client, config.GetIngestBucket(), chaptersPath, &chapters)
+		jsonPath := path.Join(assetMeta.BasePath, assetMeta.ChaptersFile)
+		err = IngestTimedMetadata(ctx, services, config, IngestTimedMetadataParams{
+			JSONPath: jsonPath,
+			VXID:     assetMeta.ID,
+		})
 		if err != nil {
-			return merry.Wrap(err)
-		}
-
-		for _, chapter := range chapters {
-			t := common.ChapterTypes.Parse(chapter.ChapterType)
-			if t == nil {
-				continue
-			}
-			timedMetadata := sqlc.InsertTimedMetadataParams{
-				ID:          uuid.New(),
-				ChapterType: null.StringFrom(t.Value),
-				Title:       chapter.Title,
-				AssetID:     null.IntFrom(int64(assetID)),
-				Highlight:   chapter.Highlight,
-				Description: chapter.Description,
-				Status:      string(common.StatusPublished),
-				Label:       chapter.Label,
-				Type:        "chapter",
-				Seconds:     float32(chapter.Timestamp),
-			}
-
-			var personIDs []uuid.UUID
-			switch *t {
-			case common.ChapterTypeSong:
-				// We only want to insert the song number if it is present
-				songID, err := getOrInsertSongID(ctx, queries, chapter.SongCollection, chapter.SongNumber)
-				if err != nil {
-					return merry.Wrap(err)
-				}
-				timedMetadata.SongID = uuid.NullUUID{
-					Valid: true,
-					UUID:  songID,
-				}
-			case common.ChapterTypeTestimony, common.ChapterTypeAppeal, common.ChapterTypeSpeech:
-				// We only want to insert the persons if they are present
-				personIDs, err = getOrInsertPersonIDs(ctx, queries, chapter.Persons)
-				if err != nil {
-					return merry.Wrap(err)
-				}
-			}
-			err = queries.InsertTimedMetadata(ctx, timedMetadata)
-			if err != nil {
-				return merry.Wrap(err)
-			}
-			for _, p := range personIDs {
-				err = queries.InsertTimedMetadataPerson(ctx, sqlc.InsertTimedMetadataPersonParams{
-					PersonsID:       p,
-					TimedmetadataID: timedMetadata.ID,
-				})
-				if err != nil {
-					return merry.Wrap(err)
-				}
-			}
+			log.L.Error().Err(err).Msg("Failed to ingest timedmetadata from the asset")
 		}
 	}
 
@@ -392,12 +351,13 @@ func Ingest(ctx context.Context, services externalServices, config config, event
 	}
 	log.L.Info().Msg("Done copying files")
 
-	log.L.Info().Msg("Creating Streams")
-	// Construct the source as an ARN
-	source := fmt.Sprintf("arn:aws:s3:::%s", path.Join(*config.GetStorageBucket(), storagePrefix, "stream", path.Base(assetMeta.SmilFile)))
-	log.L.Debug().Str("Smil source ARN", source).Msg("Calculated source ARN for MediaPackager")
-
 	if hasStreams {
+		log.L.Info().Msg("Creating Streams")
+		// Construct the source as an ARN
+		awsPath := path.Join(*config.GetStorageBucket(), destSmilPath)
+		source := fmt.Sprintf("arn:aws:s3:::%s", awsPath)
+		log.L.Debug().Str("Smil source ARN", source).Msg("Calculated source ARN for MediaPackager")
+
 		mpc := services.GetMediaPackageVOD()
 		log.L.Debug().Msg("Creating MediaPackager Asset")
 		asset, err := mpc.CreateAsset(ctx,

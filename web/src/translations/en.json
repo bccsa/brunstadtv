@@ -59,6 +59,7 @@
         "newEpisodes": "New episodes"
     },
     "episode": {
+        "chapters": "Chapters",
         "details": "Details",
         "episode": "Episode",
         "episodes": "Episodes",
@@ -147,7 +148,7 @@
     "footer": {
         "cookies": "Cookies",
         "privacyPolicy": "Privacy Policy",
-        "information": "BCC Media is a media foundation in the [BCC federation](https://bcc.no) that produces and distributes content with positive and Christian values.\n\nBCC Media is a registered broadcaster and adheres to the regulations laid down in the Norwegian Broadcasting Act. The supervisory body for this Act is [the Norwegian Media Authority](https://medietilsynet.no/).",
+        "information": "BCC Media is a media foundation in the [BCC federation](https://bcc.no) that produces and distributes content with positive and Christian values.",
         "headOffice": "Head office",
         "contactUs": "Contact us",
         "downloadApp": "Download our app",
@@ -161,13 +162,19 @@
         "copied": "Copied to clipboard",
         "membersOnly": "This video is only accessible to users that are logged in."
     },
+    "quotes": {
+        "quoteOfTheDay": "Quote of the day",
+        "markAsRead": "Mark as read",
+        "markAsUnread": "Mark as unread"
+    },
     "feedback": {
         "appreciated": "We appreciate your feedback.",
         "comment": "Add a comment to your experience",
         "episodeTitle": "How would you rate this episode?",
         "howEasyToUnderstand": "How easy was it to understand the video?",
         "anonymousInfo": "Your rating will be submitted anonymously",
-        "placeholder": "Please be as detailed as possible to help us understand."
+        "placeholder": "Please be as detailed as possible to help us understand.",
+        "giveFeedback": "Give feedback"
     },
     "contactLocalBukIfWrong": "Contact the person responsible in your local BUK association if you think this is wrong.",
     "thankYou": "Thank you!",
@@ -201,5 +208,9 @@
     },
     "shorts": {
         "watchOnOurApp": "Download the mobile app to watch shorts."
+    },
+    "subscriptions": {
+        "subscribe": "Subscribe",
+        "unsubscribe": "Unsubscribe"
     }
 }

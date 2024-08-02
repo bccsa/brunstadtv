@@ -10,6 +10,15 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     scrollbar-gutter: stable both-edges;
+    cursor:default;
+}
+
+img {
+    user-select: none;
+}
+
+*:focus-visible {
+    outline: 1px solid var(--color-tint-1)
 }
 
 .slide-fade-enter-active {
@@ -66,5 +75,18 @@ body {
     .hide-scrollbar {
         -ms-overflow-style: none; /* IE and Edge */
         scrollbar-width: none; /* Firefox */
+    }
+}
+
+.fade-expo-1s {
+    animation: fade-in 1s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fade-in {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
     }
 }

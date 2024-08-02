@@ -86,6 +86,10 @@ func (h *Handler) HandleDirectusEvent(ctx context.Context, collection string, id
 		return h.handleTimedMetadata(ctx, id)
 	case "mediaitems":
 		return h.handleMediaitem(ctx, id)
+	case "shorts":
+		return h.handleShort(ctx, id)
+	case "calendarentries":
+		return h.handleCalendarEntry(ctx, id)
 	default:
 		log.L.Debug().Str("collection", collection).Msg("Cllection not suported. Skipping")
 	}
@@ -113,7 +117,10 @@ func (h *Handler) handleShow(ctx context.Context, id int) error {
 		return nil
 	}
 
-	bqShows := lo.Map(shows, ShowFromCommon)
+	bqShows, err := h.resolveShows(ctx, shows)
+	if err != nil {
+		return merry.Wrap(err)
+	}
 	return h.insert(ctx, bqShows, "shows")
 }
 
@@ -130,7 +137,10 @@ func (h *Handler) handleSeason(ctx context.Context, id int) error {
 		return nil
 	}
 
-	bqSeasons := lo.Map(seasons, SeasonFromCommon)
+	bqSeasons, err := h.resolveSeasons(ctx, seasons)
+	if err != nil {
+		return merry.Wrap(err)
+	}
 	return h.insert(ctx, bqSeasons, "seasons")
 }
 
@@ -147,7 +157,10 @@ func (h *Handler) handleEpisode(ctx context.Context, id int) error {
 		return nil
 	}
 
-	bqEpisodes := lo.Map(episodes, EpisodeFromCommon)
+	bqEpisodes, err := h.resolveEpisodes(ctx, episodes)
+	if err != nil {
+		return merry.Wrap(err)
+	}
 	return h.insert(ctx, bqEpisodes, "episodes")
 }
 
@@ -169,15 +182,69 @@ func (h *Handler) handleTimedMetadata(ctx context.Context, id string) error {
 	return h.insert(ctx, bqTimedMetadatas, "timedmetadata")
 }
 
+// handleMediaitem updated the related shorts in BQ
+//
+// This is intentinall as most of the data about the short is stored in the mediaitem
 func (h *Handler) handleMediaitem(ctx context.Context, id string) error {
 	log.L.Debug().Str("mediaitem", id).Msg("updating mediaitem in BQ")
 	miUuid := utils.AsUuid(id)
-	mediaItem, err := h.queries.GetMediaItemByID(ctx, miUuid)
+	shorts, err := h.queries.GetShortsByMediaItemIDs(ctx, miUuid)
 	if err != nil {
 		return merry.Wrap(err)
 	}
 
-	return h.insert(ctx, MediaItemFromDb(mediaItem, 0), "mediaitem")
+	bqShorts, err := h.resolveShorts(ctx, shorts)
+	if err != nil {
+		return merry.Wrap(err)
+	}
+
+	err = h.insert(ctx, bqShorts, "shorts")
+	if err != nil {
+		return merry.Wrap(err)
+	}
+
+	episodeIDs, err := h.queries.GetEpisodeIDsByMediaItemID(ctx, miUuid)
+	if err != nil {
+		return merry.Wrap(err)
+	}
+
+	episodes, err := h.queries.GetEpisodes(ctx, episodeIDs)
+	if err != nil {
+		return merry.Wrap(err)
+	}
+
+	bqEpisodes, err := h.resolveEpisodes(ctx, episodes)
+	if err != nil {
+		return merry.Wrap(err)
+	}
+
+	return h.insert(ctx, bqEpisodes, "episodes")
+}
+
+func (h *Handler) handleShort(ctx context.Context, id string) error {
+	log.L.Debug().Str("shorts", id).Msg("updating shorts in BQ")
+	shortUuid := utils.AsUuid(id)
+	shorts, err := h.queries.GetShorts(ctx, []uuid.UUID{shortUuid})
+	if err != nil {
+		return merry.Wrap(err)
+	}
+
+	bqShorts, err := h.resolveShorts(ctx, shorts)
+	if err != nil {
+		return merry.Wrap(err)
+	}
+	return h.insert(ctx, bqShorts, "shorts")
+}
+
+func (h *Handler) handleCalendarEntry(ctx context.Context, id string) error {
+	log.L.Debug().Str("calendarEntry", id).Msg("updating calendarEntry in BQ")
+	event, err := h.queries.GetCalendarEntriesByID(ctx, []int{utils.AsInt(id)})
+	if err != nil {
+		return merry.Wrap(err)
+	}
+
+	bqEvents := lo.Map(event, CalendarEntryFromCommon)
+	return h.insert(ctx, bqEvents, "calendar_entries")
 }
 
 func (h *Handler) HandleAnswerExportToBQ(ctx context.Context) error {

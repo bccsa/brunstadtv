@@ -14,12 +14,30 @@ import (
 	null_v4 "gopkg.in/guregu/null.v4"
 )
 
+const clearAssetTimedMetadata = `-- name: ClearAssetTimedMetadata :exec
+DELETE FROM timedmetadata WHERE asset_id = $1
+`
+
+func (q *Queries) ClearAssetTimedMetadata(ctx context.Context, assetID null_v4.Int) error {
+	_, err := q.db.ExecContext(ctx, clearAssetTimedMetadata, assetID)
+	return err
+}
+
 const clearEpisodeTimedMetadata = `-- name: ClearEpisodeTimedMetadata :exec
 DELETE FROM timedmetadata WHERE episode_id = $1
 `
 
 func (q *Queries) ClearEpisodeTimedMetadata(ctx context.Context, episodeID null_v4.Int) error {
 	_, err := q.db.ExecContext(ctx, clearEpisodeTimedMetadata, episodeID)
+	return err
+}
+
+const clearMediaItemTimedMetadata = `-- name: ClearMediaItemTimedMetadata :exec
+DELETE FROM timedmetadata WHERE mediaitem_id = $1::uuid
+`
+
+func (q *Queries) ClearMediaItemTimedMetadata(ctx context.Context, mediaitemID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, clearMediaItemTimedMetadata, mediaitemID)
 	return err
 }
 
@@ -38,7 +56,8 @@ SELECT t.id,
        seconds,
        description,
        episode_id,
-       chapter_type,
+       mediaitem_id,
+       content_type,
        song_id,
        (SELECT array_agg(p.persons_id) FROM "timedmetadata_persons" p WHERE p.timedmetadata_id = t.id)::uuid[]  AS person_ids
 FROM timedmetadata t
@@ -61,7 +80,8 @@ type GetAssetTimedMetadataRow struct {
 	Seconds     float32        `db:"seconds" json:"seconds"`
 	Description null_v4.String `db:"description" json:"description"`
 	EpisodeID   null_v4.Int    `db:"episode_id" json:"episodeId"`
-	ChapterType null_v4.String `db:"chapter_type" json:"chapterType"`
+	MediaitemID uuid.NullUUID  `db:"mediaitem_id" json:"mediaitemId"`
+	ContentType null_v4.String `db:"content_type" json:"contentType"`
 	SongID      uuid.NullUUID  `db:"song_id" json:"songId"`
 	PersonIds   []uuid.UUID    `db:"person_ids" json:"personIds"`
 }
@@ -90,7 +110,8 @@ func (q *Queries) GetAssetTimedMetadata(ctx context.Context, assetID null_v4.Int
 			&i.Seconds,
 			&i.Description,
 			&i.EpisodeID,
-			&i.ChapterType,
+			&i.MediaitemID,
+			&i.ContentType,
 			&i.SongID,
 			pq.Array(&i.PersonIds),
 		); err != nil {
@@ -107,15 +128,45 @@ func (q *Queries) GetAssetTimedMetadata(ctx context.Context, assetID null_v4.Int
 	return items, nil
 }
 
-const insertTimedMetadata = `-- name: InsertTimedMetadata :exec
-INSERT INTO timedmetadata (id, status, date_created, date_updated, label, type, highlight,
-                           title, asset_id, seconds, description, episode_id, chapter_type, song_id)
-VALUES ($1, $2, NOW(), NOW(), $3, $4, $5, $6::varchar,
-        $7, $8::real, $9::varchar, $10, $11, $12)
+const insertTimedMetadata = `-- name: InsertTimedMetadata :one
+INSERT INTO timedmetadata (
+  id,
+  status,
+  date_created,
+  date_updated,
+  label,
+  type,
+  highlight,
+  title,
+  asset_id,
+  seconds,
+  description,
+  episode_id,
+  mediaitem_id,
+  content_type,
+  song_id
+)
+VALUES (
+  gen_random_uuid(),
+  $1,
+  NOW(),
+  NOW(),
+  $2,
+  $3,
+  $4,
+  $5::varchar,
+  $6,
+  $7::real,
+  $8::varchar,
+  $9,
+  $10,
+  $11,
+  $12
+)
+RETURNING id
 `
 
 type InsertTimedMetadataParams struct {
-	ID          uuid.UUID      `db:"id" json:"id"`
 	Status      string         `db:"status" json:"status"`
 	Label       string         `db:"label" json:"label"`
 	Type        string         `db:"type" json:"type"`
@@ -125,13 +176,13 @@ type InsertTimedMetadataParams struct {
 	Seconds     float32        `db:"seconds" json:"seconds"`
 	Description string         `db:"description" json:"description"`
 	EpisodeID   null_v4.Int    `db:"episode_id" json:"episodeId"`
-	ChapterType null_v4.String `db:"chapter_type" json:"chapterType"`
+	MediaitemID uuid.NullUUID  `db:"mediaitem_id" json:"mediaitemId"`
+	ContentType null_v4.String `db:"content_type" json:"contentType"`
 	SongID      uuid.NullUUID  `db:"song_id" json:"songId"`
 }
 
-func (q *Queries) InsertTimedMetadata(ctx context.Context, arg InsertTimedMetadataParams) error {
-	_, err := q.db.ExecContext(ctx, insertTimedMetadata,
-		arg.ID,
+func (q *Queries) InsertTimedMetadata(ctx context.Context, arg InsertTimedMetadataParams) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, insertTimedMetadata,
 		arg.Status,
 		arg.Label,
 		arg.Type,
@@ -141,36 +192,68 @@ func (q *Queries) InsertTimedMetadata(ctx context.Context, arg InsertTimedMetada
 		arg.Seconds,
 		arg.Description,
 		arg.EpisodeID,
-		arg.ChapterType,
+		arg.MediaitemID,
+		arg.ContentType,
 		arg.SongID,
 	)
-	return err
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getTimedMetadata = `-- name: getTimedMetadata :many
-SELECT md.id,
-       md.type,
-       md.chapter_type,
-       md.song_id,
-       (SELECT array_agg(p.persons_id) FROM "timedmetadata_persons" p WHERE p.timedmetadata_id = md.id)::uuid[] AS person_ids,
-       md.title                                                  AS original_title,
-       md.description                                            AS original_description,
+SELECT tm.id,
+       tm.type,
+       tm.content_type,
+       tm.song_id,
+       (SELECT array_agg(c.person_id) FROM "contributions" c WHERE c.timedmetadata_id = tm.id)::uuid[] AS person_ids,
+       tm.title                                                  AS original_title,
+       tm.description                                            AS original_description,
        COALESCE((SELECT json_object_agg(ts.languages_code, ts.title)
                  FROM timedmetadata_translations ts
-                 WHERE ts.timedmetadata_id = md.id), '{}')::json AS title,
+                 WHERE ts.timedmetadata_id = tm.id), '{}')::json AS title,
        COALESCE((SELECT json_object_agg(ts.languages_code, ts.description)
                  FROM timedmetadata_translations ts
-                 WHERE ts.timedmetadata_id = md.id), '{}')::json AS description,
-       md.seconds,
-       md.highlight
-FROM timedmetadata md
-WHERE md.id = ANY ($1::uuid[])
+                 WHERE ts.timedmetadata_id = tm.id), '{}')::json AS description,
+       tm.seconds,
+       tm.highlight,
+       tm.mediaitem_id,
+       COALESCE(images.images, '{}'::json)            AS images,
+       COALESCE((
+          -- if there is a next timedmetadata, calculate the duration between the current and the next timedmetadata
+          SELECT nextTm.seconds - tm.seconds
+          FROM timedmetadata nextTm
+          WHERE (nextTm.mediaitem_id = tm.mediaitem_id OR nextTm.asset_id = tm.asset_id)
+          AND nextTm.seconds > tm.seconds
+          ORDER BY nextTm.seconds
+          LIMIT 1
+        ), (
+          -- if there is no next timedmetadata, calculate the duration of the asset
+          SELECT asset.duration - tm.seconds
+          FROM assets asset
+          WHERE asset.id = tm.asset_id
+          OR asset.id = mi.asset_id
+          LIMIT 1
+        ), 0)::float as duration
+FROM timedmetadata tm
+LEFT JOIN mediaitems mi ON (mi.id = tm.mediaitem_id)
+LEFT JOIN (
+    SELECT
+    simg.timedmetadata_id,
+    json_agg(json_build_object('style', img.style, 'language', img.language, 'filename_disk', df.filename_disk)) AS images
+    FROM timedmetadata_styledimages simg
+    JOIN styledimages img ON (img.id = simg.styledimages_id)
+    JOIN directus_files df ON (img.file = df.id)
+    WHERE simg.timedmetadata_id = ANY($1::uuid[])
+    GROUP BY simg.timedmetadata_id
+) images ON (images.timedmetadata_id = tm.id)
+WHERE tm.id = ANY ($1::uuid[])
 `
 
 type getTimedMetadataRow struct {
 	ID                  uuid.UUID       `db:"id" json:"id"`
 	Type                string          `db:"type" json:"type"`
-	ChapterType         null_v4.String  `db:"chapter_type" json:"chapterType"`
+	ContentType         null_v4.String  `db:"content_type" json:"contentType"`
 	SongID              uuid.NullUUID   `db:"song_id" json:"songId"`
 	PersonIds           []uuid.UUID     `db:"person_ids" json:"personIds"`
 	OriginalTitle       null_v4.String  `db:"original_title" json:"originalTitle"`
@@ -179,6 +262,9 @@ type getTimedMetadataRow struct {
 	Description         json.RawMessage `db:"description" json:"description"`
 	Seconds             float32         `db:"seconds" json:"seconds"`
 	Highlight           bool            `db:"highlight" json:"highlight"`
+	MediaitemID         uuid.NullUUID   `db:"mediaitem_id" json:"mediaitemId"`
+	Images              json.RawMessage `db:"images" json:"images"`
+	Duration            float64         `db:"duration" json:"duration"`
 }
 
 func (q *Queries) getTimedMetadata(ctx context.Context, ids []uuid.UUID) ([]getTimedMetadataRow, error) {
@@ -193,7 +279,7 @@ func (q *Queries) getTimedMetadata(ctx context.Context, ids []uuid.UUID) ([]getT
 		if err := rows.Scan(
 			&i.ID,
 			&i.Type,
-			&i.ChapterType,
+			&i.ContentType,
 			&i.SongID,
 			pq.Array(&i.PersonIds),
 			&i.OriginalTitle,
@@ -202,6 +288,9 @@ func (q *Queries) getTimedMetadata(ctx context.Context, ids []uuid.UUID) ([]getT
 			&i.Description,
 			&i.Seconds,
 			&i.Highlight,
+			&i.MediaitemID,
+			&i.Images,
+			&i.Duration,
 		); err != nil {
 			return nil, err
 		}

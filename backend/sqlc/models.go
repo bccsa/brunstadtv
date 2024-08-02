@@ -126,6 +126,12 @@ type ApplicationgroupsUsergroup struct {
 	UsergroupsCode      string    `db:"usergroups_code" json:"usergroupsCode"`
 }
 
+type ApplicationgroupsUsergroupsL struct {
+	ID                  int32          `db:"id" json:"id"`
+	ApplicationgroupsID uuid.NullUUID  `db:"applicationgroups_id" json:"applicationgroupsId"`
+	UsergroupsCode      null_v4.String `db:"usergroups_code" json:"usergroupsCode"`
+}
+
 type Asset struct {
 	DateCreated     time.Time      `db:"date_created" json:"dateCreated"`
 	DateUpdated     time.Time      `db:"date_updated" json:"dateUpdated"`
@@ -277,6 +283,18 @@ type Computeddatum struct {
 	GroupID     uuid.UUID      `db:"group_id" json:"groupId"`
 	Value       string         `db:"value" json:"value"`
 	Label       null_v4.String `db:"label" json:"label"`
+}
+
+type Contribution struct {
+	ID              int32         `db:"id" json:"id"`
+	UserCreated     uuid.NullUUID `db:"user_created" json:"userCreated"`
+	DateCreated     null_v4.Time  `db:"date_created" json:"dateCreated"`
+	UserUpdated     uuid.NullUUID `db:"user_updated" json:"userUpdated"`
+	DateUpdated     null_v4.Time  `db:"date_updated" json:"dateUpdated"`
+	PersonID        uuid.UUID     `db:"person_id" json:"personId"`
+	Type            string        `db:"type" json:"type"`
+	MediaitemID     uuid.NullUUID `db:"mediaitem_id" json:"mediaitemId"`
+	TimedmetadataID uuid.NullUUID `db:"timedmetadata_id" json:"timedmetadataId"`
 }
 
 type DirectusActivity struct {
@@ -642,7 +660,7 @@ type Episode struct {
 	LegacyTagsID             null_v4.Int           `db:"legacy_tags_id" json:"legacyTagsId"`
 	LegacyTitleID            null_v4.Int           `db:"legacy_title_id" json:"legacyTitleId"`
 	MigrationData            pqtype.NullRawMessage `db:"migration_data" json:"migrationData"`
-	PublishDate              time.Time             `db:"publish_date" json:"publishDate"`
+	PublishDate              null_v4.Time          `db:"publish_date" json:"publishDate"`
 	SeasonID                 null_v4.Int           `db:"season_id" json:"seasonId"`
 	Status                   string                `db:"status" json:"status"`
 	Type                     string                `db:"type" json:"type"`
@@ -650,7 +668,7 @@ type Episode struct {
 	UserUpdated              uuid.NullUUID         `db:"user_updated" json:"userUpdated"`
 	PublishDateInTitle       sql.NullBool          `db:"publish_date_in_title" json:"publishDateInTitle"`
 	Label                    null_v4.String        `db:"label" json:"label"`
-	ProductionDate           time.Time             `db:"production_date" json:"productionDate"`
+	ProductionDate           null_v4.Time          `db:"production_date" json:"productionDate"`
 	PublicTitle              null_v4.String        `db:"public_title" json:"publicTitle"`
 	PreventPublicIndexing    sql.NullBool          `db:"prevent_public_indexing" json:"preventPublicIndexing"`
 	Uuid                     uuid.UUID             `db:"uuid" json:"uuid"`
@@ -658,6 +676,7 @@ type Episode struct {
 	Audience                 null_v4.String        `db:"audience" json:"audience"`
 	TimedmetadataFromAsset   bool                  `db:"timedmetadata_from_asset" json:"timedmetadataFromAsset"`
 	TranslationsRequired     bool                  `db:"translations_required" json:"translationsRequired"`
+	MediaitemID              uuid.NullUUID         `db:"mediaitem_id" json:"mediaitemId"`
 }
 
 type EpisodeAvailability struct {
@@ -799,7 +818,7 @@ type FilterDataset struct {
 	AgeratingCode null_v4.String `db:"agerating_code" json:"ageratingCode"`
 	Number        null_v4.Int    `db:"number" json:"number"`
 	Type          string         `db:"type" json:"type"`
-	PublishDate   time.Time      `db:"publish_date" json:"publishDate"`
+	PublishDate   null_v4.Time   `db:"publish_date" json:"publishDate"`
 	Published     sql.NullBool   `db:"published" json:"published"`
 	AvailableFrom interface{}    `db:"available_from" json:"availableFrom"`
 	AvailableTo   interface{}    `db:"available_to" json:"availableTo"`
@@ -946,19 +965,37 @@ type MaterializedViewsMetum struct {
 }
 
 type Mediaitem struct {
-	ID              uuid.UUID       `db:"id" json:"id"`
-	UserCreated     uuid.NullUUID   `db:"user_created" json:"userCreated"`
-	DateCreated     null_v4.Time    `db:"date_created" json:"dateCreated"`
-	UserUpdated     uuid.NullUUID   `db:"user_updated" json:"userUpdated"`
-	DateUpdated     null_v4.Time    `db:"date_updated" json:"dateUpdated"`
-	Label           string          `db:"label" json:"label"`
-	Title           null_v4.String  `db:"title" json:"title"`
-	Description     null_v4.String  `db:"description" json:"description"`
-	Type            string          `db:"type" json:"type"`
-	AssetID         null_v4.Int     `db:"asset_id" json:"assetId"`
-	ParentEpisodeID null_v4.Int     `db:"parent_episode_id" json:"parentEpisodeId"`
-	ParentStartsAt  sql.NullFloat64 `db:"parent_starts_at" json:"parentStartsAt"`
-	ParentEndsAt    sql.NullFloat64 `db:"parent_ends_at" json:"parentEndsAt"`
+	ID                     uuid.UUID       `db:"id" json:"id"`
+	UserCreated            uuid.NullUUID   `db:"user_created" json:"userCreated"`
+	DateCreated            null_v4.Time    `db:"date_created" json:"dateCreated"`
+	UserUpdated            uuid.NullUUID   `db:"user_updated" json:"userUpdated"`
+	DateUpdated            null_v4.Time    `db:"date_updated" json:"dateUpdated"`
+	Label                  string          `db:"label" json:"label"`
+	Title                  null_v4.String  `db:"title" json:"title"`
+	Description            null_v4.String  `db:"description" json:"description"`
+	Type                   string          `db:"type" json:"type"`
+	AssetID                null_v4.Int     `db:"asset_id" json:"assetId"`
+	ParentEpisodeID        null_v4.Int     `db:"parent_episode_id" json:"parentEpisodeId"`
+	ParentStartsAt         sql.NullFloat64 `db:"parent_starts_at" json:"parentStartsAt"`
+	ParentEndsAt           sql.NullFloat64 `db:"parent_ends_at" json:"parentEndsAt"`
+	PublishedAt            null_v4.Time    `db:"published_at" json:"publishedAt"`
+	ProductionDate         null_v4.Time    `db:"production_date" json:"productionDate"`
+	ParentID               uuid.NullUUID   `db:"parent_id" json:"parentId"`
+	ContentType            null_v4.String  `db:"content_type" json:"contentType"`
+	Audience               null_v4.String  `db:"audience" json:"audience"`
+	AgeratingCode          null_v4.String  `db:"agerating_code" json:"ageratingCode"`
+	TranslationsRequired   bool            `db:"translations_required" json:"translationsRequired"`
+	TimedmetadataFromAsset bool            `db:"timedmetadata_from_asset" json:"timedmetadataFromAsset"`
+	AvailableFrom          null_v4.Time    `db:"available_from" json:"availableFrom"`
+	AvailableTo            null_v4.Time    `db:"available_to" json:"availableTo"`
+	PrimaryEpisodeID       null_v4.Int     `db:"primary_episode_id" json:"primaryEpisodeId"`
+}
+
+type MediaitemsAsset struct {
+	ID           int32     `db:"id" json:"id"`
+	MediaitemsID uuid.UUID `db:"mediaitems_id" json:"mediaitemsId"`
+	AssetsID     int32     `db:"assets_id" json:"assetsId"`
+	Language     string    `db:"language" json:"language"`
 }
 
 type MediaitemsStyledimage struct {
@@ -975,23 +1012,57 @@ type MediaitemsTag struct {
 
 type MediaitemsTranslation struct {
 	ID            int32          `db:"id" json:"id"`
-	MediaitemsID  uuid.NullUUID  `db:"mediaitems_id" json:"mediaitemsId"`
-	LanguagesCode null_v4.String `db:"languages_code" json:"languagesCode"`
+	MediaitemsID  uuid.UUID      `db:"mediaitems_id" json:"mediaitemsId"`
+	LanguagesCode string         `db:"languages_code" json:"languagesCode"`
 	Title         null_v4.String `db:"title" json:"title"`
 	Description   null_v4.String `db:"description" json:"description"`
 }
 
+type MediaitemsUsergroup struct {
+	ID             int32     `db:"id" json:"id"`
+	MediaitemsID   uuid.UUID `db:"mediaitems_id" json:"mediaitemsId"`
+	UsergroupsCode string    `db:"usergroups_code" json:"usergroupsCode"`
+}
+
+type MediaitemsUsergroupsDownload struct {
+	ID             int32     `db:"id" json:"id"`
+	MediaitemsID   uuid.UUID `db:"mediaitems_id" json:"mediaitemsId"`
+	UsergroupsCode string    `db:"usergroups_code" json:"usergroupsCode"`
+}
+
+type MediaitemsUsergroupsEarlyaccess struct {
+	ID             int32     `db:"id" json:"id"`
+	MediaitemsID   uuid.UUID `db:"mediaitems_id" json:"mediaitemsId"`
+	UsergroupsCode string    `db:"usergroups_code" json:"usergroupsCode"`
+}
+
 type MediaitemsView struct {
-	ID                  uuid.UUID       `db:"id" json:"id"`
-	AssetID             null_v4.Int     `db:"asset_id" json:"assetId"`
-	OriginalTitle       null_v4.String  `db:"original_title" json:"originalTitle"`
-	OriginalDescription null_v4.String  `db:"original_description" json:"originalDescription"`
-	Title               json.RawMessage `db:"title" json:"title"`
-	Description         json.RawMessage `db:"description" json:"description"`
-	Images              json.RawMessage `db:"images" json:"images"`
-	ParentEpisodeID     null_v4.Int     `db:"parent_episode_id" json:"parentEpisodeId"`
-	ParentStartsAt      sql.NullFloat64 `db:"parent_starts_at" json:"parentStartsAt"`
-	ParentEndsAt        sql.NullFloat64 `db:"parent_ends_at" json:"parentEndsAt"`
+	ID                   uuid.UUID       `db:"id" json:"id"`
+	Assets               json.RawMessage `db:"assets" json:"assets"`
+	AssetID              null_v4.Int     `db:"asset_id" json:"assetId"`
+	OriginalTitle        null_v4.String  `db:"original_title" json:"originalTitle"`
+	OriginalDescription  null_v4.String  `db:"original_description" json:"originalDescription"`
+	Title                json.RawMessage `db:"title" json:"title"`
+	Description          json.RawMessage `db:"description" json:"description"`
+	Images               json.RawMessage `db:"images" json:"images"`
+	ParentID             uuid.NullUUID   `db:"parent_id" json:"parentId"`
+	ParentEpisodeID      null_v4.Int     `db:"parent_episode_id" json:"parentEpisodeId"`
+	ParentStartsAt       sql.NullFloat64 `db:"parent_starts_at" json:"parentStartsAt"`
+	ParentEndsAt         sql.NullFloat64 `db:"parent_ends_at" json:"parentEndsAt"`
+	AvailableFrom        time.Time       `db:"available_from" json:"availableFrom"`
+	AvailableTo          time.Time       `db:"available_to" json:"availableTo"`
+	Label                string          `db:"label" json:"label"`
+	AgeratingCode        null_v4.String  `db:"agerating_code" json:"ageratingCode"`
+	Audience             null_v4.String  `db:"audience" json:"audience"`
+	ContentType          null_v4.String  `db:"content_type" json:"contentType"`
+	ProductionDate       time.Time       `db:"production_date" json:"productionDate"`
+	PublishedAt          time.Time       `db:"published_at" json:"publishedAt"`
+	TranslationsRequired bool            `db:"translations_required" json:"translationsRequired"`
+	DateUpdated          null_v4.Time    `db:"date_updated" json:"dateUpdated"`
+	Duration             null_v4.Int     `db:"duration" json:"duration"`
+	AssetDateUpdated     null_v4.Time    `db:"asset_date_updated" json:"assetDateUpdated"`
+	TagIds               []int32         `db:"tag_ids" json:"tagIds"`
+	TimedmetadataIds     []uuid.UUID     `db:"timedmetadata_ids" json:"timedmetadataIds"`
 }
 
 type Message struct {
@@ -1096,6 +1167,12 @@ type Person struct {
 	Name string    `db:"name" json:"name"`
 }
 
+type PersonsStyledimage struct {
+	ID             int32     `db:"id" json:"id"`
+	PersonsID      uuid.UUID `db:"persons_id" json:"personsId"`
+	StyledimagesID uuid.UUID `db:"styledimages_id" json:"styledimagesId"`
+}
+
 type Phrase struct {
 	Key         string        `db:"key" json:"key"`
 	UserCreated uuid.NullUUID `db:"user_created" json:"userCreated"`
@@ -1190,15 +1267,16 @@ type QuestionalternativesTranslation struct {
 }
 
 type Redirect struct {
-	ID           uuid.UUID    `db:"id" json:"id"`
-	Status       string       `db:"status" json:"status"`
-	UserCreated  uuid.UUID    `db:"user_created" json:"userCreated"`
-	DateCreated  null_v4.Time `db:"date_created" json:"dateCreated"`
-	UserUpdated  uuid.UUID    `db:"user_updated" json:"userUpdated"`
-	DateUpdated  null_v4.Time `db:"date_updated" json:"dateUpdated"`
-	TargetUrl    string       `db:"target_url" json:"targetUrl"`
-	Code         string       `db:"code" json:"code"`
-	IncludeToken sql.NullBool `db:"include_token" json:"includeToken"`
+	ID                     uuid.UUID    `db:"id" json:"id"`
+	Status                 string       `db:"status" json:"status"`
+	UserCreated            uuid.UUID    `db:"user_created" json:"userCreated"`
+	DateCreated            null_v4.Time `db:"date_created" json:"dateCreated"`
+	UserUpdated            uuid.UUID    `db:"user_updated" json:"userUpdated"`
+	DateUpdated            null_v4.Time `db:"date_updated" json:"dateUpdated"`
+	TargetUrl              string       `db:"target_url" json:"targetUrl"`
+	Code                   string       `db:"code" json:"code"`
+	IncludeToken           sql.NullBool `db:"include_token" json:"includeToken"`
+	RequiresAuthentication bool         `db:"requires_authentication" json:"requiresAuthentication"`
 }
 
 type Season struct {
@@ -1286,6 +1364,7 @@ type Section struct {
 	EmbedHeight          null_v4.Int     `db:"embed_height" json:"embedHeight"`
 	PrependLiveElement   sql.NullBool    `db:"prepend_live_element" json:"prependLiveElement"`
 	TranslationsRequired bool            `db:"translations_required" json:"translationsRequired"`
+	Limit                null_v4.Int     `db:"limit" json:"limit"`
 }
 
 type SectionsTranslation struct {
@@ -1582,6 +1661,12 @@ type TimedmetadataPerson struct {
 	PersonsID       uuid.UUID `db:"persons_id" json:"personsId"`
 }
 
+type TimedmetadataStyledimage struct {
+	ID              int32         `db:"id" json:"id"`
+	TimedmetadataID uuid.NullUUID `db:"timedmetadata_id" json:"timedmetadataId"`
+	StyledimagesID  uuid.NullUUID `db:"styledimages_id" json:"styledimagesId"`
+}
+
 type TimedmetadataTranslation struct {
 	ID              int32          `db:"id" json:"id"`
 	TimedmetadataID uuid.UUID      `db:"timedmetadata_id" json:"timedmetadataId"`
@@ -1604,9 +1689,10 @@ type Timedmetadatum struct {
 	Description null_v4.String `db:"description" json:"description"`
 	AssetID     null_v4.Int    `db:"asset_id" json:"assetId"`
 	EpisodeID   null_v4.Int    `db:"episode_id" json:"episodeId"`
-	ChapterType null_v4.String `db:"chapter_type" json:"chapterType"`
+	ContentType null_v4.String `db:"content_type" json:"contentType"`
 	SongID      uuid.NullUUID  `db:"song_id" json:"songId"`
 	Seconds     float32        `db:"seconds" json:"seconds"`
+	MediaitemID uuid.NullUUID  `db:"mediaitem_id" json:"mediaitemId"`
 }
 
 type Usergroup struct {
@@ -1666,6 +1752,7 @@ type UsersMediaProgress struct {
 	UpdatedAt time.Time             `db:"updated_at" json:"updatedAt"`
 	Context   pqtype.NullRawMessage `db:"context" json:"context"`
 	WatchedAt null_v4.Time          `db:"watched_at" json:"watchedAt"`
+	FromStart bool                  `db:"from_start" json:"fromStart"`
 }
 
 type UsersMessage struct {
@@ -1696,6 +1783,11 @@ type UsersProgress struct {
 	Watched   null_v4.Int           `db:"watched" json:"watched"`
 	WatchedAt null_v4.Time          `db:"watched_at" json:"watchedAt"`
 	Context   pqtype.NullRawMessage `db:"context" json:"context"`
+}
+
+type UsersSubscription struct {
+	Key       string    `db:"key" json:"key"`
+	ProfileID uuid.UUID `db:"profile_id" json:"profileId"`
 }
 
 type UsersSurveyquestionanswer struct {

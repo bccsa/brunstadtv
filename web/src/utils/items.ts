@@ -1,17 +1,16 @@
 import {
     GetSectionQuery,
     SectionItemFragment,
-    GetCalendarDayQuery,
     GetDefaultEpisodeForTopicDocument,
     GetDefaultEpisodeForTopicQuery,
     GetDefaultEpisodeForTopicQueryVariables,
     GetDefaultEpisodeForShowQuery,
     GetDefaultEpisodeForShowQueryVariables,
     GetDefaultEpisodeForShowDocument,
-    useGetPlaylistEpisodeQuery,
     GetPlaylistEpisodeQuery,
     GetPlaylistEpisodeQueryVariables,
     GetPlaylistEpisodeDocument,
+    Link,
 } from "@/graph/generated"
 import router from "@/router"
 import { analytics, Page } from "@/services/analytics"
@@ -42,12 +41,16 @@ export const goToEpisode = (
     }
 }
 
+export const goToLink = async (item: Partial<Link>) => {
+    if (!item.url) return
+    window.location.assign(item.url)
+}
 export const goToPlaylist = async (playlistId: string) => {
     const result = await client
-        .query<GetPlaylistEpisodeQuery, GetPlaylistEpisodeQueryVariables>(
-            GetPlaylistEpisodeDocument,
-            { id: playlistId }
-        )
+        .query<
+            GetPlaylistEpisodeQuery,
+            GetPlaylistEpisodeQueryVariables
+        >(GetPlaylistEpisodeDocument, { id: playlistId })
         .toPromise()
     for (const i of result.data?.playlist.items.items ?? []) {
         if (i.__typename === "Episode") {
@@ -158,6 +161,8 @@ export const goToSectionItem = async (
         case "Playlist":
             await goToPlaylist(item.item.item.id)
             break
+        case "Link":
+            await goToLink(item.item.item)
     }
 }
 
@@ -168,32 +173,6 @@ export const comingSoon = (item: SectionItemFragment) => {
                 item.item.locked &&
                 new Date(item.item.publishDate).getTime() > new Date().getTime()
             )
-    }
-    return false
-}
-
-export const isLive = (
-    item: SectionItemFragment,
-    currentDay: NonNullable<GetCalendarDayQuery["calendar"]>["day"] | null
-) => {
-    if (!currentDay) return false
-    switch (item.item.__typename) {
-        case "Episode":
-            if (!item.item.locked) return false
-            for (const e of currentDay.entries ?? []) {
-                if (
-                    e.__typename === "EpisodeCalendarEntry" &&
-                    e.episode?.id === item.item.id
-                ) {
-                    const now = new Date().getTime()
-                    const start = new Date(e.start).getTime()
-                    const end = new Date(e.end).getTime()
-                    if (start <= now && end >= now) {
-                        return true
-                    }
-                    console.log(now, start, end)
-                }
-            }
     }
     return false
 }

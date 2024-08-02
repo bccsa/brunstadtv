@@ -59,6 +59,7 @@
         "newEpisodes": "Novi deli"
     },
     "episode": {
+        "chapters": "Poglavja",
         "details": "Podrobnosti",
         "episode": "Del",
         "episodes": "Deli",
@@ -147,7 +148,7 @@
     "footer": {
         "cookies": "Piškotki",
         "privacyPolicy": "Pravilnik o zasebnosti",
-        "information": "BCC Media je medijska fundacija v BCC zvezi (https://bcc.no), ki proizvaja in širi vsebino s pozitivnimi in krščanskimi vrednotami.\n\nBCC je registriran izdajatelj televizijskega programa in spoštuje pravila norveškega zakonika o oddajanju. Nadzorno telo tega zakonika je [the Norwegian Media Authority](https://medietilsynet.no/).",
+        "information": "BCC Media je medijska fundacija v [ BCC zvezi](https://bcc.no), ki proizvaja in širi vsebino s pozitivnimi in krščanskimi vrednotami.",
         "headOffice": "Sedež podjetja",
         "contactUs": "Kontaktiraj nas",
         "downloadApp": "Prenesi našo aplikacijo",
@@ -161,13 +162,19 @@
         "copied": "Kopirano v odlagališče",
         "membersOnly": "Ta video je na voljo samo prijavljenim uporabnikom."
     },
+    "quotes": {
+        "quoteOfTheDay": "Citat dneva",
+        "markAsRead": "Označi kot prebrano",
+        "markAsUnread": "Označi kot neprebrano"
+    },
     "feedback": {
         "appreciated": "Cenimo tvojo povratno informacijo.",
         "comment": "Dodaj komentar k tvoji izkušnji",
         "episodeTitle": "Kako bi ocenil ta del?",
         "howEasyToUnderstand": "Kako razumljiv je bil ta video?",
         "anonymousInfo": "Tvoja ocena je anonimna",
-        "placeholder": "Za lažje razumevanje, prosim, napiši čim več podrobnosti."
+        "placeholder": "Za lažje razumevanje, prosim, napiši čim več podrobnosti.",
+        "giveFeedback": "Pošlji povratne informacije"
     },
     "contactLocalBukIfWrong": "Kontaktiraj odgovorno osebo za tvoj BUK, če misliš, da je prišlo do napake.",
     "thankYou": "Hvala!",
@@ -201,5 +208,9 @@
     },
     "shorts": {
         "watchOnOurApp": "Za ogled kratkih filmov prenesi mobilno aplikacijo."
+    },
+    "subscriptions": {
+        "subscribe": "Naroči se",
+        "unsubscribe": "Odjavi se"
     }
 }

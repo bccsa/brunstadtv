@@ -7,7 +7,7 @@
 </template>
 <script lang="ts" setup>
 import { onMounted, onUnmounted, onUpdated, ref } from "vue"
-import { Player } from "bccm-video-player"
+import { Options, Player } from "bccm-video-player"
 import playerFactory from "@/services/player"
 import {
     EpisodeContext,
@@ -24,6 +24,7 @@ import { analytics } from "@/services/analytics"
 import { useRoute } from "vue-router"
 import { createVjsMenuButton, type MenuItem } from "@/components/videojs/Menu"
 import { languages } from "@/services/language"
+import { currentApp } from "@/services/app"
 
 const { isAuthenticated } = useAuth0()
 
@@ -49,7 +50,7 @@ const lanTo3letter: {
 
 const route = useRoute()
 
-const { data, executeQuery } = useGetMeQuery()
+const { data, executeQuery } = useGetMeQuery({ variables: {} })
 
 const props = defineProps<{
     context: EpisodeContext
@@ -57,6 +58,7 @@ const props = defineProps<{
         id: string
         uuid: string
         title: string
+        originalTitle: string
         duration: number
         progress?: number | null
         season?: {
@@ -123,7 +125,7 @@ const load = async () => {
             await executeQuery()
         }
 
-        const options = {
+        const options: Partial<Options> = {
             languagePreferenceDefaults: {
                 audio: lanTo3letter[currentLanguage.value.code],
                 subtitles: lanTo3letter[currentLanguage.value.code],
@@ -134,6 +136,7 @@ const load = async () => {
             npaw: {
                 enabled: !!import.meta.env.VITE_NPAW_ACCOUNT_CODE,
                 accountCode: import.meta.env.VITE_NPAW_ACCOUNT_CODE,
+                appName: currentApp.value,
                 tracking: {
                     isLive: false,
                     userId: data.value?.me.analytics.anonymousId!,
@@ -141,8 +144,7 @@ const load = async () => {
                     ageGroup: analytics.getUser()?.ageGroup,
                     metadata: {
                         contentId: props.episode.id,
-                        title: props.episode.title,
-                        episodeTitle: props.episode.title,
+                        title: props.episode.originalTitle,
                         seasonTitle: props.episode.season?.title,
                         seasonId: props.episode.season?.id,
                         showTitle: props.episode.season?.show.title,
@@ -180,10 +182,6 @@ const load = async () => {
             player.value.currentTime(seekTo)
         }
 
-        // player.value.on("play", analytics.track("playback_started", ))
-        // player.value.on("ended", analytics.track("playback_ended", undefined))
-        // player.value.on("pause", analytics.track("playback_paused", undefined))
-        // player.value.on("error", analytics.track("playback_interrupted", undefined))
         if (isAuthenticated.value) {
             player.value.on("timeupdate", checkProgress)
         }
@@ -270,5 +268,8 @@ onUnmounted(async () => {
     player.value?.dispose()
     window.removeEventListener("keydown", onSpaceBar)
 })
+
+defineExpose({
+    player,
+})
 </script>
-@/components/videojs/Menu

@@ -42,18 +42,58 @@ func (r *episodesResolver) ImportTimedMetadata(ctx context.Context, obj *model.E
 		return false, err
 	}
 	for _, m := range metadata {
-		m.ID = uuid.New()
-		m.AssetID = null_v4.Int{}
 		m.EpisodeID = null_v4.IntFrom(intID)
 
-		err = r.Queries.InsertTimedMetadata(ctx, sqlc.InsertTimedMetadataParams{
-			ID:          uuid.New(),
-			EpisodeID:   null_v4.IntFrom(intID),
+		_, err = r.Queries.InsertTimedMetadata(ctx, sqlc.InsertTimedMetadataParams{
+			EpisodeID:   m.EpisodeID,
 			Title:       m.Title.String,
 			Description: m.Description.String,
 			Seconds:     m.Seconds,
 			Type:        m.Type,
-			ChapterType: m.ChapterType,
+			ContentType: m.ContentType,
+			Label:       m.Label,
+			Status:      m.Status,
+			Highlight:   m.Highlight,
+			SongID:      m.SongID,
+		})
+		if err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+// ImportTimedMetadata is the resolver for the importTimedMetadata field.
+func (r *mediaItemsResolver) ImportTimedMetadata(ctx context.Context, obj *model.MediaItems, mediaItemID string) (bool, error) {
+	uid, err := uuid.Parse(mediaItemID)
+	if err != nil {
+		return false, err
+	}
+	mediaItem, err := r.Queries.GetMediaItemByID(ctx, uid)
+	if err != nil {
+		return false, err
+	}
+	if !mediaItem.AssetID.Valid {
+		return false, nil
+	}
+	metadata, err := r.Queries.GetAssetTimedMetadata(ctx, mediaItem.AssetID)
+	if err != nil {
+		return false, err
+	}
+	err = r.Queries.ClearMediaItemTimedMetadata(ctx, mediaItem.ID)
+	if err != nil {
+		return false, err
+	}
+	for _, m := range metadata {
+		m.MediaitemID = uuid.NullUUID{UUID: mediaItem.ID, Valid: true}
+
+		_, err = r.Queries.InsertTimedMetadata(ctx, sqlc.InsertTimedMetadataParams{
+			MediaitemID: m.MediaitemID,
+			Title:       m.Title.String,
+			Description: m.Description.String,
+			Seconds:     m.Seconds,
+			Type:        m.Type,
+			ContentType: m.ContentType,
 			Label:       m.Label,
 			Status:      m.Status,
 			Highlight:   m.Highlight,
@@ -99,7 +139,12 @@ func (r *previewResolver) Asset(ctx context.Context, obj *model.Preview, id stri
 	}
 
 	streams = lo.Filter(streams, func(s common.Stream, _ int) bool {
-		return !strings.Contains(s.Url, common.IgnoreEpisodeAssetEndpoint)
+		for _, ignore := range common.IgnoreEpisodeAssetEndpoints {
+			if strings.Contains(s.Url, ignore) {
+				return false
+			}
+		}
+		return true
 	})
 
 	stream, found := lo.Find(streams, func(s common.Stream) bool {
@@ -127,6 +172,11 @@ func (r *queryRootResolver) Statistics(ctx context.Context) (*model.Statistics, 
 // Episodes is the resolver for the episodes field.
 func (r *queryRootResolver) Episodes(ctx context.Context) (*model.Episodes, error) {
 	return &model.Episodes{}, nil
+}
+
+// MediaItems is the resolver for the mediaItems field.
+func (r *queryRootResolver) MediaItems(ctx context.Context) (*model.MediaItems, error) {
+	return &model.MediaItems{}, nil
 }
 
 // LessonProgressGroupedByOrg is the resolver for the lessonProgressGroupedByOrg field.
@@ -165,6 +215,9 @@ func (r *statisticsResolver) LessonProgressGroupedByOrg(ctx context.Context, obj
 // Episodes returns generated.EpisodesResolver implementation.
 func (r *Resolver) Episodes() generated.EpisodesResolver { return &episodesResolver{r} }
 
+// MediaItems returns generated.MediaItemsResolver implementation.
+func (r *Resolver) MediaItems() generated.MediaItemsResolver { return &mediaItemsResolver{r} }
+
 // Preview returns generated.PreviewResolver implementation.
 func (r *Resolver) Preview() generated.PreviewResolver { return &previewResolver{r} }
 
@@ -175,6 +228,7 @@ func (r *Resolver) QueryRoot() generated.QueryRootResolver { return &queryRootRe
 func (r *Resolver) Statistics() generated.StatisticsResolver { return &statisticsResolver{r} }
 
 type episodesResolver struct{ *Resolver }
+type mediaItemsResolver struct{ *Resolver }
 type previewResolver struct{ *Resolver }
 type queryRootResolver struct{ *Resolver }
 type statisticsResolver struct{ *Resolver }

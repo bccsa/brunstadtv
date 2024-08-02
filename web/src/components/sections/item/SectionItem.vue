@@ -1,36 +1,26 @@
 <template>
     <div class="relative">
-        <Pill
-            color="bg-red"
-            class="absolute -top-1 -right-1 pointer-events-none"
-            v-if="isLive(i, currentDay)"
-            >{{ $t("episode.liveNow") }}</Pill
-        >
         <NewPill
-            class="absolute -top-1 -right-1 pointer-events-none"
+            class="absolute -top-1 -right-1 pointer-events-none overflow-hidden"
             :item="i"
-            v-else-if="!comingSoon(i)"
+            v-if="!comingSoon(i)"
         ></NewPill>
-        <Pill class="absolute -top-1 -right-1 pointer-events-none" v-else>{{
-            $t("episode.comingSoon")
-        }}</Pill>
+        <Pill
+            class="absolute -top-1 -right-1 pointer-events-none overflow-hidden z-50"
+            v-else
+            >{{ $t("episode.comingSoon") }}</Pill
+        >
         <div
             class="flex flex-col mt-2 transition"
             :class="{
-                'cursor-pointer': !comingSoon(i) || isLive(i, currentDay),
-                'pointer-events-none': comingSoon(i) && !isLive(i, currentDay),
+                'cursor-pointer': !comingSoon(i),
+                'pointer-events-none': comingSoon(i),
                 'opacity-50': clicked,
             }"
-            @click="
-                isLive(i, currentDay)
-                    ? $router.push('/live')
-                    : !comingSoon(i)
-                    ? click()
-                    : undefined
-            "
+            @click="!comingSoon(i) ? click() : undefined"
         >
             <div
-                class="relative mb-1 rounded-md w-full overflow-hidden hover:opacity-90 transition"
+                class="relative mb-1 rounded-md w-full overflow-hidden hover:brightness-[1.15] transition group ease-out-expo"
                 :class="aspect"
             >
                 <div v-if="clicked" class="absolute w-full h-full flex">
@@ -38,7 +28,7 @@
                 </div>
                 <Image
                     :src="i.image"
-                    class="rounded-md"
+                    class="rounded-md group-hover:scale-[101%] transition-transform ease-out-expo duration-500"
                     loading="lazy"
                     size-source="height"
                     :ratio="ratio"
@@ -49,11 +39,7 @@
                     :item="i.item"
                 />
                 <div
-                    v-if="
-                        !isLive(i, currentDay) &&
-                        comingSoon(i) &&
-                        i.item.__typename === 'Episode'
-                    "
+                    v-if="comingSoon(i) && i.item.__typename === 'Episode'"
                     class="absolute flex top-0 h-full w-full bg-black bg-opacity-80"
                 >
                     <div
@@ -62,10 +48,10 @@
                         <LockClosedIcon
                             class="h-8 fill-gray my-auto"
                         ></LockClosedIcon>
-                        <p class="font-semibold text-sm text-slate-300">
+                        <p class="text-style-button-1 text-slate-300">
                             {{ $t("episode.comingSoon") }}
                         </p>
-                        <p class="text-base font-semibold text-slate-300">
+                        <p class="text-style-button-1 text-slate-300">
                             {{ new Date(i.item.publishDate).toLocaleString() }}
                         </p>
                     </div>
@@ -82,9 +68,8 @@
 import ProgressBar from "@/components/episodes/ProgressBar.vue"
 import Image from "@/components/Image.vue"
 import Loader from "@/components/Loader.vue"
-import { useCalendar } from "@/composables/calendar"
 import { SectionItemFragment } from "@/graph/generated"
-import { comingSoon, isLive } from "@/utils/items"
+import { comingSoon } from "@/utils/items"
 import { LockClosedIcon } from "@heroicons/vue/24/solid"
 import { computed, ref } from "vue"
 import NewPill from "./NewPill.vue"
@@ -103,8 +88,6 @@ const props = withDefaults(
     }>(),
     { secondaryTitles: false }
 )
-
-const { currentDay } = useCalendar()
 
 const clicked = ref(false)
 

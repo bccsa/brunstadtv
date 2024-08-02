@@ -7,6 +7,7 @@ import (
 
 	"github.com/bcc-code/bcc-media-platform/backend/auth0"
 	"github.com/bcc-code/bcc-media-platform/backend/crowdin"
+	"github.com/bcc-code/bcc-media-platform/backend/files"
 	"github.com/bcc-code/bcc-media-platform/backend/members"
 	"github.com/bcc-code/bcc-media-platform/backend/search"
 	"github.com/bcc-code/bcc-media-platform/backend/statistics"
@@ -31,8 +32,14 @@ type cloudTasks struct {
 	QueueID string
 }
 
+type videomanipulatorConfig struct {
+	baseURL string
+	apiKey  string
+}
+
 type envConfig struct {
 	AWS               awsConfig
+	AzureStorage      files.AzureConfig
 	Port              string
 	DeleteIngestFiles bool
 	DB                utils.DatabaseConfig
@@ -47,6 +54,7 @@ type envConfig struct {
 	Auth0             auth0.Config
 	Members           members.Config
 	BigQuery          statistics.BigQueryConfig
+	VideoManipulator  videomanipulatorConfig
 }
 
 func getEnvConfig() envConfig {
@@ -72,6 +80,11 @@ func getEnvConfig() envConfig {
 			MediapackageSourceARN: os.Getenv("AWS_MEDIAPACKAGE_SOURCE"),
 			IngestBucket:          os.Getenv("AWS_INGEST_BUCKET"),
 			StorageBucket:         os.Getenv("AWS_STORAGE_BUCKET"),
+		},
+		AzureStorage: files.AzureConfig{
+			AccountName: os.Getenv("AZURE_STORAGE_ACCOUNT_NAME"),
+			AccountKey:  os.Getenv("AZURE_STORAGE_ACCOUNT_KEY"),
+			Container:   os.Getenv("AZURE_STORAGE_CONTAINER"),
 		},
 		DB: utils.DatabaseConfig{
 			ConnectionString:   os.Getenv("DB_CONNECTION_STRING"),
@@ -115,6 +128,10 @@ func getEnvConfig() envConfig {
 		BigQuery: statistics.BigQueryConfig{
 			ProjectID: os.Getenv("BIGQUERY_PROJECT"), // Export disabed if empty
 			DatasetID: os.Getenv("BIGQUERY_DATASET"),
+		},
+		VideoManipulator: videomanipulatorConfig{
+			baseURL: os.Getenv("VIDEOMANIPULATOR_BASE_URL"),
+			apiKey:  os.Getenv("VIDEOMANIPULATOR_API_KEY"),
 		},
 	}
 }

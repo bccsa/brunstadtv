@@ -25,6 +25,10 @@ type CollectionItem interface {
 	GetDescription() *string
 }
 
+type ContributionItem interface {
+	IsContributionItem()
+}
+
 type EpisodeContextUnion interface {
 	IsEpisodeContextUnion()
 }
@@ -57,6 +61,7 @@ type MediaItem interface {
 	GetStreams() []*Stream
 	GetFiles() []*File
 	GetTitle() string
+	GetOriginalTitle() string
 	GetImage() *string
 }
 
@@ -217,13 +222,34 @@ type AnswerSurveyQuestionResult struct {
 }
 
 type Application struct {
-	ID            string `json:"id"`
-	Code          string `json:"code"`
-	ClientVersion string `json:"clientVersion"`
-	Page          *Page  `json:"page,omitempty"`
-	SearchPage    *Page  `json:"searchPage,omitempty"`
-	GamesPage     *Page  `json:"gamesPage,omitempty"`
+	ID                string `json:"id"`
+	Code              string `json:"code"`
+	ClientVersion     string `json:"clientVersion"`
+	Page              *Page  `json:"page,omitempty"`
+	SearchPage        *Page  `json:"searchPage,omitempty"`
+	GamesPage         *Page  `json:"gamesPage,omitempty"`
+	LivestreamEnabled bool   `json:"livestreamEnabled"`
 }
+
+type AvatarSection struct {
+	ID          string                 `json:"id"`
+	Metadata    *ItemSectionMetadata   `json:"metadata,omitempty"`
+	Title       *string                `json:"title,omitempty"`
+	Description *string                `json:"description,omitempty"`
+	Size        SectionSize            `json:"size"`
+	Items       *SectionItemPagination `json:"items"`
+}
+
+func (AvatarSection) IsSection()                   {}
+func (this AvatarSection) GetID() string           { return this.ID }
+func (this AvatarSection) GetTitle() *string       { return this.Title }
+func (this AvatarSection) GetDescription() *string { return this.Description }
+
+func (AvatarSection) IsItemSection() {}
+
+func (this AvatarSection) GetMetadata() *ItemSectionMetadata { return this.Metadata }
+
+func (this AvatarSection) GetItems() *SectionItemPagination { return this.Items }
 
 type BirthOptions struct {
 	Year int `json:"year"`
@@ -286,12 +312,22 @@ func (this CardSection) GetMetadata() *ItemSectionMetadata { return this.Metadat
 func (this CardSection) GetItems() *SectionItemPagination { return this.Items }
 
 type Chapter struct {
-	ID          string  `json:"id"`
-	Start       int     `json:"start"`
-	Title       string  `json:"title"`
-	Image       *string `json:"image,omitempty"`
-	Description *string `json:"description,omitempty"`
+	ID          string       `json:"id"`
+	Start       int          `json:"start"`
+	Title       string       `json:"title"`
+	Image       *string      `json:"image,omitempty"`
+	Description *string      `json:"description,omitempty"`
+	Duration    int          `json:"duration"`
+	Episode     *Episode     `json:"episode,omitempty"`
+	ContentType *ContentType `json:"contentType"`
 }
+
+func (Chapter) IsCollectionItem()            {}
+func (this Chapter) GetID() string           { return this.ID }
+func (this Chapter) GetTitle() string        { return this.Title }
+func (this Chapter) GetDescription() *string { return this.Description }
+
+func (Chapter) IsContributionItem() {}
 
 type Config struct {
 	Global *GlobalConfig `json:"global"`
@@ -301,6 +337,16 @@ type ConfirmAchievementResult struct {
 	Success bool `json:"success"`
 }
 
+type ContentType struct {
+	Code  string `json:"code"`
+	Title string `json:"title"`
+}
+
+type ContentTypeCount struct {
+	Type  *ContentType `json:"type"`
+	Count int          `json:"count"`
+}
+
 type ContextCollection struct {
 	ID    string                 `json:"id"`
 	Slug  *string                `json:"slug,omitempty"`
@@ -308,6 +354,34 @@ type ContextCollection struct {
 }
 
 func (ContextCollection) IsEpisodeContextUnion() {}
+
+type Contribution struct {
+	Type        *ContributionType `json:"type"`
+	ContentType *ContentType      `json:"contentType"`
+	Item        ContributionItem  `json:"item"`
+}
+
+type ContributionType struct {
+	Code  string `json:"code"`
+	Title string `json:"title"`
+}
+
+type ContributionTypeCount struct {
+	Type  *ContributionType `json:"type"`
+	Count int               `json:"count"`
+}
+
+type ContributionsPagination struct {
+	Total  int             `json:"total"`
+	First  int             `json:"first"`
+	Offset int             `json:"offset"`
+	Items  []*Contribution `json:"items"`
+}
+
+func (ContributionsPagination) IsPagination()       {}
+func (this ContributionsPagination) GetTotal() int  { return this.Total }
+func (this ContributionsPagination) GetFirst() int  { return this.First }
+func (this ContributionsPagination) GetOffset() int { return this.Offset }
 
 type DefaultGridSection struct {
 	ID          string                 `json:"id"`
@@ -377,6 +451,7 @@ type Episode struct {
 	AvailableFrom         string                 `json:"availableFrom"`
 	AvailableTo           string                 `json:"availableTo"`
 	AgeRating             string                 `json:"ageRating"`
+	OriginalTitle         string                 `json:"originalTitle"`
 	Title                 string                 `json:"title"`
 	Description           string                 `json:"description"`
 	ExtraDescription      string                 `json:"extraDescription"`
@@ -385,6 +460,8 @@ type Episode struct {
 	Streams               []*Stream              `json:"streams"`
 	Files                 []*File                `json:"files"`
 	Chapters              []*Chapter             `json:"chapters"`
+	SkipToChapter         *Chapter               `json:"skipToChapter,omitempty"`
+	AssetVersion          string                 `json:"assetVersion"`
 	Season                *Season                `json:"season,omitempty"`
 	Duration              int                    `json:"duration"`
 	Progress              *int                   `json:"progress,omitempty"`
@@ -434,6 +511,10 @@ func (this Episode) GetFiles() []*File {
 	}
 	return interfaceSlice
 }
+
+func (this Episode) GetOriginalTitle() string { return this.OriginalTitle }
+
+func (Episode) IsContributionItem() {}
 
 func (Episode) IsSectionItemType() {}
 
@@ -656,6 +737,8 @@ type ItemSectionMetadata struct {
 	CollectionID       string `json:"collectionId"`
 	UseContext         bool   `json:"useContext"`
 	PrependLiveElement bool   `json:"prependLiveElement"`
+	Page               *Page  `json:"page,omitempty"`
+	Limit              *int   `json:"limit,omitempty"`
 }
 
 type LabelSection struct {
@@ -786,11 +869,10 @@ type Message struct {
 }
 
 type MessageSection struct {
-	ID          string               `json:"id"`
-	Metadata    *ItemSectionMetadata `json:"metadata,omitempty"`
-	Title       *string              `json:"title,omitempty"`
-	Description *string              `json:"description,omitempty"`
-	Messages    []*Message           `json:"messages,omitempty"`
+	ID          string     `json:"id"`
+	Title       *string    `json:"title,omitempty"`
+	Description *string    `json:"description,omitempty"`
+	Messages    []*Message `json:"messages,omitempty"`
 }
 
 func (MessageSection) IsSection()                   {}
@@ -802,6 +884,9 @@ type MessageStyle struct {
 	Text       string `json:"text"`
 	Background string `json:"background"`
 	Border     string `json:"border"`
+}
+
+type MutationRoot struct {
 }
 
 type NameOptions struct {
@@ -831,6 +916,17 @@ func (PageDetailsSection) IsSection()                   {}
 func (this PageDetailsSection) GetID() string           { return this.ID }
 func (this PageDetailsSection) GetTitle() *string       { return this.Title }
 func (this PageDetailsSection) GetDescription() *string { return this.Description }
+
+type Person struct {
+	ID                       string                   `json:"id"`
+	Name                     string                   `json:"name"`
+	Image                    *string                  `json:"image,omitempty"`
+	ContributionTypes        []*ContributionTypeCount `json:"contributionTypes"`
+	ContributionContentTypes []*ContentTypeCount      `json:"contributionContentTypes"`
+	Contributions            *ContributionsPagination `json:"contributions"`
+}
+
+func (Person) IsSectionItemType() {}
 
 type Playlist struct {
 	ID          string                  `json:"id"`
@@ -920,6 +1016,9 @@ type Profile struct {
 	Name string `json:"name"`
 }
 
+type QueryRoot struct {
+}
+
 type Question struct {
 	ID       string       `json:"id"`
 	Category *FAQCategory `json:"category"`
@@ -952,7 +1051,8 @@ func (this QuoteTask) GetTitle() string   { return this.Title }
 func (this QuoteTask) GetCompleted() bool { return this.Completed }
 
 type RedirectLink struct {
-	URL string `json:"url"`
+	URL                    string `json:"url"`
+	RequiresAuthentication bool   `json:"requiresAuthentication"`
 }
 
 type RedirectParam struct {
@@ -1084,14 +1184,15 @@ func (this SectionPagination) GetFirst() int  { return this.First }
 func (this SectionPagination) GetOffset() int { return this.Offset }
 
 type Short struct {
-	ID          string         `json:"id"`
-	Title       string         `json:"title"`
-	Description *string        `json:"description,omitempty"`
-	Image       *string        `json:"image,omitempty"`
-	Streams     []*Stream      `json:"streams"`
-	Files       []*File        `json:"files"`
-	Source      *SubclipSource `json:"source,omitempty"`
-	InMyList    bool           `json:"inMyList"`
+	ID            string         `json:"id"`
+	Title         string         `json:"title"`
+	OriginalTitle string         `json:"originalTitle"`
+	Description   *string        `json:"description,omitempty"`
+	Image         *string        `json:"image,omitempty"`
+	Streams       []*Stream      `json:"streams"`
+	Files         []*File        `json:"files"`
+	Source        *SubclipSource `json:"source,omitempty"`
+	InMyList      bool           `json:"inMyList"`
 }
 
 func (Short) IsSectionItemType() {}
@@ -1127,6 +1228,8 @@ func (this Short) GetFiles() []*File {
 	}
 	return interfaceSlice
 }
+
+func (this Short) GetOriginalTitle() string { return this.OriginalTitle }
 
 func (Short) IsUserCollectionEntryItem() {}
 
@@ -1225,6 +1328,7 @@ func (this SimpleCalendarEntry) GetEnd() string         { return this.End }
 type Stream struct {
 	ID                string     `json:"id"`
 	URL               string     `json:"url"`
+	ExpiresAt         string     `json:"expiresAt"`
 	VideoLanguage     *string    `json:"videoLanguage,omitempty"`
 	AudioLanguages    []string   `json:"audioLanguages"`
 	SubtitleLanguages []string   `json:"subtitleLanguages"`
@@ -1396,15 +1500,14 @@ func (this VideoTask) GetTitle() string   { return this.Title }
 func (this VideoTask) GetCompleted() bool { return this.Completed }
 
 type WebSection struct {
-	ID             string               `json:"id"`
-	Metadata       *ItemSectionMetadata `json:"metadata,omitempty"`
-	Title          *string              `json:"title,omitempty"`
-	Description    *string              `json:"description,omitempty"`
-	URL            string               `json:"url"`
-	WidthRatio     float64              `json:"widthRatio"`
-	AspectRatio    *float64             `json:"aspectRatio,omitempty"`
-	Height         *int                 `json:"height,omitempty"`
-	Authentication bool                 `json:"authentication"`
+	ID             string   `json:"id"`
+	Title          *string  `json:"title,omitempty"`
+	Description    *string  `json:"description,omitempty"`
+	URL            string   `json:"url"`
+	WidthRatio     float64  `json:"widthRatio"`
+	AspectRatio    *float64 `json:"aspectRatio,omitempty"`
+	Height         *int     `json:"height,omitempty"`
+	Authentication bool     `json:"authentication"`
 }
 
 func (WebSection) IsSection()                   {}
@@ -1870,5 +1973,44 @@ func (e *StreamType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e StreamType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type SubscriptionTopic string
+
+const (
+	SubscriptionTopicComics SubscriptionTopic = "comics"
+)
+
+var AllSubscriptionTopic = []SubscriptionTopic{
+	SubscriptionTopicComics,
+}
+
+func (e SubscriptionTopic) IsValid() bool {
+	switch e {
+	case SubscriptionTopicComics:
+		return true
+	}
+	return false
+}
+
+func (e SubscriptionTopic) String() string {
+	return string(e)
+}
+
+func (e *SubscriptionTopic) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SubscriptionTopic(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SubscriptionTopic", str)
+	}
+	return nil
+}
+
+func (e SubscriptionTopic) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
